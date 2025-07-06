@@ -3,25 +3,21 @@
         <img src="logo.svg" alt="NVIDIA Driver Installer" width="150">
     </a>
 </p>
-<h1 align="center">NVIDIA 驱动多系统通用安装脚本</h1>
-<p align="center">支持多种 Linux 发行版的自动化 NVIDIA 驱动安装脚本</p>
-
-<p align="center">
-    一键启动↓
-</p>
+<h1 align="center">NVIDIA 驱动通用安装脚本</h1>
+<p align="center">一个脚本，支持多种 Linux 发行版的自动化 NVIDIA 驱动安装</p>
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/EM-GeekLab/nvidia-driver-installer/main/nvidia_installer.sh -o nvidia_installer.sh
-sudo bash nvidia_installer.sh
+curl -sSL https://raw.githubusercontent.com/EM-GeekLab/nvidia-driver-installer/main/nvidia-install.sh -o nvidia-install.sh
+sudo bash nvidia-install.sh
 ```
 
 <p align="center">
-    简体中文 | <a href="README.en-US.md">English</a>
+    简体中文 | <a href="README.en.md">English</a>
 </p>
 <p align="center">
   <a href="https://github.com/EM-GeekLab/nvidia-driver-installer/blob/main/LICENSE"><img src="https://shields.io/github/license/EM-GeekLab/nvidia-driver-installer?color=%2376b900" alt="License: Apache 2.0"></a>
   <a href="https://github.com/EM-GeekLab/nvidia-driver-installer"><img src="https://img.shields.io/github/stars/EM-GeekLab/nvidia-driver-installer?color=%2376b900" alt="Stars"></a>
-<a href="https://deepwiki.com/EM-GeekLab/LLMOne"><img src="https://deepwiki.com/badge.svg" alt="Ask DeepWiki"></a>
+<a href="https://deepwiki.com/EM-GeekLab/nvidia-driver-installer"><img src="https://deepwiki.com/badge.svg" alt="Ask DeepWiki"></a>
 </p>
 
 <div align="center">
@@ -84,20 +80,80 @@ sudo bash nvidia_installer.sh
 > [!WARNING]
 > 对于其他基于 Debian 或 RHEL 的衍生发行版，脚本也可能兼容，但未经充分测试。
 
+### 📖 简介
+
+本项目旨在提供一个通用的 NVIDIA 驱动安装脚本，支持多种 Linux 发行版。它通过包管理器（如 `dnf`、`apt`、`zypper` 等）自动化安装 NVIDIA 驱动，避免了手动下载和运行 `.run` 文件的繁琐过程。
+
+同时脚本提供了高度自动化的安装体验，支持无人值守安装、幂等性操作、状态恢复和回滚机制，确保在各种环境下都能稳定运行。
+
 ### 🚀 快速开始
 
-如果您希望快速安装 NVIDIA 驱动，可以直接使用以下命令：
+> [!NOTE]
+> 为安全起见，推荐您采用以下两步法进行安装。这使您有机会在执行前审查脚本内容。
+
 ```bash
-curl -sSL https://raw.githubusercontent.com/EM-GeekLab/nvidia-driver-installer/main/nvidia_installer.sh -o nvidia_installer.sh
-sudo bash nvidia_installer.sh
+curl -sSL https://raw.githubusercontent.com/EM-GeekLab/nvidia-driver-installer/main/nvidia-install.sh -o nvidia-install.sh
+sudo bash nvidia-install.sh
 ```
 
-将提供一个可交互的安装向导，帮助您完成 NVIDIA 驱动的安装。
+该命令将通过一个可交互的安装向导，帮助您完成 NVIDIA 驱动的安装。
 
 若您需要在 CI/CD 环境或自动化脚本中使用，可以添加 `-y` 参数实现无人值守安装：
 ```bash
-sudo bash nvidia_installer.sh -y -q --auto-reboot
+sudo bash nvidia-install.sh -y -q --auto-reboot
 ```
+
+### 🛠️ 用法与选项
+
+脚本提供了丰富的命令行参数以满足不同场景的需求。
+
+用法: `./nvidia-install.sh [选项]`
+
+#### 基本选项:
+    -h, --help              显示此帮助信息
+    -t, --type TYPE         安装类型: full, compute-only, desktop-only (默认: full)
+    -m, --modules TYPE      内核模块类型: open, proprietary (默认: open)
+    -l, --local             使用本地仓库安装
+    -v, --version VERSION   指定驱动版本 (例如: 575)
+
+#### 自动化选项:
+    -y, --yes               自动确认所有提示 (无交互模式)
+    -q, --quiet             静默模式，减少输出
+    -f, --force             强制重新安装，即使已安装驱动
+    -s, --skip-checks       跳过现有安装检查
+    --auto-reboot           安装完成后自动重启
+
+#### 高级选项:
+    --cleanup               清理失败的安装状态并退出
+    --rollback              回滚到安装前状态
+    --show-exit-codes       显示所有退出码及其含义
+
+#### 示例
+
+*   **交互式安装 (推荐)**
+    ```bash
+    sudo bash nvidia-install.sh
+    ```
+
+*   **完全自动化安装 (CI/CD 环境)**
+    ```bash
+    sudo bash nvidia-install.sh -y -q --auto-reboot
+    ```
+
+*   **安装纯计算驱动，并使用专有内核模块**
+    ```bash
+    sudo bash nvidia-install.sh -t compute-only -m proprietary -y
+    ```
+
+*   **回滚所有更改**
+    ```bash
+    sudo bash nvidia-install.sh --rollback
+    ```
+
+*   **查看所有退出码含义**
+    ```bash
+    ./nvidia-install.sh --show-exit-codes
+    ```
 
 ### ✨ 项目特性
 
