@@ -2322,7 +2322,6 @@ main() {
         echo "=============================================="
         echo "  NVIDIA驱动官方安装脚本 v2.1"
         echo "  基于NVIDIA Driver Installation Guide r575"
-        echo "  支持幂等操作和状态恢复"
         if [[ "$AUTO_YES" == "true" ]]; then
             echo "  无交互自动化模式"
         fi
