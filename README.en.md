@@ -193,16 +193,16 @@ This script is particularly useful in the following scenarios:
 
 ### 🆚 Comparison with Runfile Installation Method
 
-| Feature         | This Script (Package Manager Method)                                        | Official `.run` File                                                      |
-| :-------------- | :-------------------------------------------------------------------------- | :------------------------------------------------------------------------ |
-| **Integration** | ✅ **High**: Deeply integrated with the system package manager (`dnf`/`apt`/`zypper`), with clear dependency relationships. | ❌ **Low**: Independent of the package manager, like being "air-dropped" into the system, which may conflict with system libraries. |
-| **Uninstallation**| ✅ **Clean, Thorough**: Easily uninstalled via the package manager. The `--rollback` feature can revert all changes. | ⚠️ **Difficult, Incomplete**: `nvidia-uninstall` may leave residues; manual cleanup is complex and error-prone. |
-| **Automation**  | ✅ **Very Easy**: Rich command-line options and environment variables are tailored for automation. | ⚠️ **More Complex**: Requires concatenating many `--silent` series parameters, with poor fault tolerance. |
-| **Idempotency** | ✅ **Yes**: Can be safely re-run.                                            | ❌ **No**: Re-running usually leads to installation failure or conflicts. |
-| **Rollback**    | ✅ **Supported**: One-click rollback to the pre-installation state.          | ❌ **Not Supported**: No rollback mechanism.                               |
-| **Secure Boot** | ✅ **Intelligent Handling**: Automatically detects and provides solutions, can assist with MOK signing. | ❌ **Not Supported**: Requires the user to manually handle all Secure Boot related issues before installation. |
-| **Offline Install**| ⚠️ **Indirectly Supported**: Requires setting up a local repository first. | ✅ **Directly Supported**: The `.run` file itself is an offline installation package. |
-| **Latest Drivers**| ⚠️ **Depends on Repository**: Driver version update speed depends on the official NVIDIA repository. | ✅ **Fastest**: NVIDIA's official website usually releases the latest drivers in `.run` format first. |
+| Feature             | This Script (Package Manager Method)                                                                                       | Official `.run` File                                                                                                               |
+| :------------------ | :------------------------------------------------------------------------------------------------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------- |
+| **Integration**     | ✅ **High**: Deeply integrated with the system package manager (`dnf`/`apt`/`zypper`), with clear dependency relationships. | ❌ **Low**: Independent of the package manager, like being "air-dropped" into the system, which may conflict with system libraries. |
+| **Uninstallation**  | ✅ **Clean, Thorough**: Easily uninstalled via the package manager. The `--rollback` feature can revert all changes.        | ⚠️ **Difficult, Incomplete**: `nvidia-uninstall` may leave residues; manual cleanup is complex and error-prone.                     |
+| **Automation**      | ✅ **Very Easy**: Rich command-line options and environment variables are tailored for automation.                          | ⚠️ **More Complex**: Requires concatenating many `--silent` series parameters, with poor fault tolerance.                           |
+| **Idempotency**     | ✅ **Yes**: Can be safely re-run.                                                                                           | ❌ **No**: Re-running usually leads to installation failure or conflicts.                                                           |
+| **Rollback**        | ✅ **Supported**: One-click rollback to the pre-installation state.                                                         | ❌ **Not Supported**: No rollback mechanism.                                                                                        |
+| **Secure Boot**     | ✅ **Intelligent Handling**: Automatically detects and provides solutions, can assist with MOK signing.                     | ❌ **Not Supported**: Requires the user to manually handle all Secure Boot related issues before installation.                      |
+| **Offline Install** | ⚠️ **Indirectly Supported**: Requires setting up a local repository first.                                                  | ✅ **Directly Supported**: The `.run` file itself is an offline installation package.                                               |
+| **Latest Drivers**  | ⚠️ **Depends on Repository**: Driver version update speed depends on the official NVIDIA repository.                        | ✅ **Fastest**: NVIDIA's official website usually releases the latest drivers in `.run` format first.                               |
 
 
 
