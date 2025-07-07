@@ -879,7 +879,7 @@ check_nvidia_gpu() {
     local detected_architectures=()
     
     while IFS= read -r line; do
-        ((gpu_count++))
+        ((++gpu_count))
         local gpu_info=$(echo "$line" | grep -E "(VGA|3D controller)")
         if [[ -n "$gpu_info" ]]; then
             log_success "检测到NVIDIA GPU #$gpu_count: $gpu_info"
