@@ -1114,6 +1114,7 @@ show_usage() {
     -m, --modules TYPE      内核模块类型: open, proprietary (默认: open)
     -l, --local             使用本地仓库安装
     -v, --version VERSION   指定驱动版本 (例如: 575)
+    --lang LANG             设置界面语言: zh_CN, en_US (默认: zh_CN)
 
 自动化选项:
     -y, --yes               自动确认所有提示 (无交互模式)
@@ -1134,6 +1135,7 @@ show_usage() {
     NVIDIA_INSTALLER_TYPE=full         等同于 -t full
     NVIDIA_INSTALLER_FORCE=true        等同于 -f
     NVIDIA_INSTALLER_REBOOT=true       等同于 --auto-reboot
+    NVIDIA_INSTALLER_LANG=zh_CN        设置界面语言 (zh_CN, en_US)
 
 示例:
     # 交互式安装
@@ -1308,6 +1310,10 @@ parse_arguments() {
             --auto-reboot)
                 REBOOT_AFTER_INSTALL=true
                 shift
+                ;;
+            --lang)
+                LANG_CURRENT="$2"
+                shift 2
                 ;;
             --cleanup)
                 cleanup_failed_install
@@ -3189,8 +3195,55 @@ check_root() {
     fi
 }
 
+# 语言选择函数
+select_language() {
+    # 如果是自动化模式或静默模式，使用默认语言
+    if [[ "$AUTO_YES" == "true" ]] || [[ "$QUIET_MODE" == "true" ]]; then
+        return 0
+    fi
+    
+    # 如果不是交互式终端，使用默认语言
+    if [[ ! -t 0 ]]; then
+        return 0
+    fi
+    
+    # 如果已经通过环境变量设置了语言，跳过选择
+    if [[ -n "$NVIDIA_INSTALLER_LANG" ]]; then
+        LANG_CURRENT="$NVIDIA_INSTALLER_LANG"
+        return 0
+    fi
+    
+    echo
+    echo "=================================================="
+    echo "  Language Selection / 语言选择"
+    echo "=================================================="
+    echo
+    echo "Please select your preferred language:"
+    echo "请选择您首选的语言:"
+    echo
+    
+    local choice=$(select_option "Please enter your choice / 请输入您的选择:" "1" \
+        "中文 (Simplified Chinese)" \
+        "English")
+    
+    case $choice in
+        1)
+            LANG_CURRENT="zh_CN"
+            echo "已选择中文 / Chinese selected"
+            ;;
+        2)
+            LANG_CURRENT="en_US"
+            echo "English selected / 已选择英文"
+            ;;
+    esac
+    echo
+}
+
 # 主函数 (添加状态管理和无交互支持)
 main() {
+    # 语言选择（在任何输出之前）
+    select_language
+    
     # 检测终端环境，如果不是TTY则自动启用静默模式
     if [[ ! -t 0 ]] && [[ "$QUIET_MODE" != "true" ]]; then
         log_info $(gettext "main.info.non_interactive_quiet_mode")
