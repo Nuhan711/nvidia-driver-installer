@@ -9,6 +9,24 @@
 # Website: https://nvidia-install.online
 # 基于 NVIDIA Driver Installation Guide: https://docs.nvidia.com/datacenter/tesla/driver-installation-guide/index.html
 # 支持 RHEL系、SUSE系、Debian系、Fedora、Amazon Linux、Azure Linux等发行版
+# 本脚本需要 root 权限运行，建议使用 sudo 执行。
+
+# ==============================================================================
+# Usage
+# ==============================================================================
+# 1. download the script
+#
+#   $ curl -sSL https://raw.githubusercontent.com/EM-GeekLab/nvidia-driver-installer/main/nvidia-install.sh -o nvidia-install.sh
+#
+# 2. verify the script's content
+#
+#   $ cat nvidia-install.sh
+#
+# 3. run the script either as root, or using sudo to perform the installation.
+#
+#   $ sudo bash nvidia-install.sh
+#
+# ==============================================================================
 
 set -e
 
