@@ -1,34 +1,37 @@
 #!/bin/bash
 
-# NVIDIA 驱动多系统通用安装脚本
+# NVIDIA 驱动一键安装脚本
+# NVIDIA Driver One-Click Installer
 
 # Author: PEScn @ EM-GeekLab
-# Modified: 2025-07-02
+# Modified: 2025-07-09
 # License: MIT
 # GitHub: https://github.com/EM-GeekLab/nvidia-driver-installer
 # Website: https://nvidia-install.online
-# 基于 NVIDIA Driver Installation Guide: https://docs.nvidia.com/datacenter/tesla/driver-installation-guide/index.html
-# 支持 RHEL系、SUSE系、Debian系、Fedora、Amazon Linux、Azure Linux等发行版
-# 本脚本需要 root 权限运行，建议使用 sudo 执行。
+# Base on NVIDIA Driver Installation Guide: https://docs.nvidia.com/datacenter/tesla/driver-installation-guide/index.html
+# Supports Ubuntu, CentOS, SUSE, RHEL, Fedora, Amazon Linux, Azure Linux and other distributions.
+# This script need `root` privileges to run, or use `sudo` to run it.
 
 # ==============================================================================
-# Usage
+# Usage | 用法
 # ==============================================================================
-# 1. download the script
+# 1. download the script | 下载脚本
 #
 #   $ curl -sSL https://raw.githubusercontent.com/EM-GeekLab/nvidia-driver-installer/main/nvidia-install.sh -o nvidia-install.sh
 #
-# 2. verify the script's content
+# 2. [Optional] verify the script's content | 【可选】验证脚本内容
 #
 #   $ cat nvidia-install.sh
 #
-# 3. run the script either as root, or using sudo to perform the installation.
+# 3. run the script either as root, or using sudo to perform the installation. | 以 root 权限或使用 sudo 运行脚本进行安装
 #
 #   $ sudo bash nvidia-install.sh
 #
 # ==============================================================================
 
 set -e
+
+readonly SCRIPT_VERSION="2.2"
 
 # Color Definitions for echo output
 readonly RED='\033[0;31m'
@@ -125,18 +128,392 @@ NVIDIA_INSTALLER_MODULES=${NVIDIA_INSTALLER_MODULES:-"open"}
 NVIDIA_INSTALLER_TYPE=${NVIDIA_INSTALLER_TYPE:-"full"}
 NVIDIA_INSTALLER_FORCE=${NVIDIA_INSTALLER_FORCE:-false}
 NVIDIA_INSTALLER_REBOOT=${NVIDIA_INSTALLER_REBOOT:-false}
+LANG_CURRENT="${NVIDIA_INSTALLER_LANG:-zh_CN}"  # 默认语言为中文
+
+# ================ 语言包定义 ===================
+declare -A LANG_PACK_ZH_CN
+
+# 中文语言包
+LANG_PACK_ZH_CN=(
+    ["exit.handler.receive_signal"]="收到信号:"
+    ["exit.handler.exit_code"]="退出码:"
+    ["exit.handler.script_interrupted"]="脚本被下列信号中断:"
+    ["exit.handler.state_saved_for_resume"]="保存中断状态，可使用相同命令继续安装"
+    ["exit.handler.temp_files_starting"]="开始清理临时文件..."
+    ["clean.release_lock_file"]="释放锁文件"
+    ["state.lock.error.another_install_running"]="另一个安装进程正在运行, PID: "
+    ["state.lock.cleaning_orphaned_file"]="发现孤立的锁文件，将清理"
+    ["state.lock.created"]="创建安装锁:"
+    ["exit.code.prompt"]="错误码:"
+    ["exit_code.success"]="成功完成"
+    ["exit_code.permission"]="权限和环境错误 (1-9):"
+    ["exit_code.permission.no_root"]="非root权限运行"
+    ["exit_code.permission.fs_denied"]="文件系统权限不足"
+    ["exit_code.permission.state_dir_failed"]="状态目录创建失败"
+    ["exit_code.hardware"]="硬件检测错误 (10-19):"
+    ["exit_code.hardware.no_gpu_detected"]="未检测到NVIDIA GPU"
+    ["exit_code.hardware.lspci_unavailable"]="lspci命令不可用"
+    ["exit_code.hardware.gpu_arch_incompatible"]="GPU架构不兼容"
+    ["exit_code.compatibility"]="系统兼容性错误 (20-29):"
+    ["exit_code.compatibility.unsupported_os"]="不支持的操作系统"
+    ["exit_code.compatibility.unsupported_version"]="不支持的发行版版本"
+    ["exit_code.compatibility.unsupported_arch"]="不支持的系统架构"
+    ["exit_code.config"]="参数和配置错误 (30-39):"
+    ["exit_code.config.invalid_args"]="无效的命令行参数"
+    ["exit_code.config.invalid_install_type"]="无效的安装类型"
+    ["exit_code.config.module_arch_mismatch"]="模块类型与GPU架构不匹配"
+    ["exit_code.secure_boot"]="Secure Boot相关错误 (40-49):"
+    ["exit_code.secure_boot.user_exit"]="Secure Boot启用，用户选择退出"
+    ["exit_code.secure_boot.auto_failed"]="Secure Boot启用，自动化模式无法处理"
+    ["exit_code.secure_boot.mok_operation_failed"]="MOK密钥操作失败"
+    ["exit_code.secure_boot.mok_tools_missing"]="缺少MOK管理工具"
+    ["exit_code.conflict"]="现有驱动冲突 (50-59):"
+    ["exit_code.conflict.existing_driver_user_exit"]="现有驱动冲突，用户选择退出"
+    ["exit_code.conflict.driver_uninstall_failed"]="现有驱动卸载失败"
+    ["exit_code.conflict.nouveau_disable_failed"]="nouveau驱动禁用失败"
+    ["exit_code.network"]="网络和下载错误 (60-69):"
+    ["exit_code.network.connection_failed"]="网络连接失败"
+    ["exit_code.network.repo_download_failed"]="仓库下载失败"
+    ["exit_code.network.keyring_download_failed"]="CUDA keyring下载失败"
+    ["exit_code.pkg_manager"]="包管理器错误 (70-79):"
+    ["exit_code.pkg_manager.unavailable"]="包管理器不可用"
+    ["exit_code.pkg_manager.repo_add_failed"]="仓库添加失败"
+    ["exit_code.pkg_manager.dependency_install_failed"]="依赖包安装失败"
+    ["exit_code.pkg_manager.kernel_headers_failed"]="内核头文件安装失败"
+    ["exit_code.pkg_manager.nvidia_install_failed"]="NVIDIA驱动安装失败"
+    ["exit_code.system_state"]="系统状态错误 (80-89):"
+    ["exit_code.system_state.kernel_version_issue"]="内核版本问题"
+    ["exit_code.system_state.dkms_build_failed"]="DKMS构建失败"
+    ["exit_code.system_state.module_signing_failed"]="模块签名失败"
+    ["exit_code.system_state.driver_verification_failed"]="驱动验证失败"
+    ["exit_code.state_management"]="状态管理错误 (90-99):"
+    ["exit_code.state_management.rollback_file_missing"]="回滚文件缺失"
+    ["exit_code.state_management.rollback_failed"]="回滚操作失败"
+    ["exit_code.state_management.state_file_corrupted"]="状态文件损坏"
+    ["exit_code.user_cancelled"]="用户取消安装"
+    ["exit_code.unknown_code"]="未知错误码:"
+    ["auto_yes.prompt"]="自动确认命令:"
+    ["select_option.prompt.range"]="请选择，可选范围:"
+    ["select_option.prompt.default"]="默认:"
+    ["select_option.prompt.invalid_choice"]="无效选择，可选范围:"
+    ["args.info.auto_mode_enabled"]="自动化模式已启用"
+    ["args.info.quiet_mode_enabled"]="静默模式已启用"
+    ["args.error.invalid_module_type"]="无效的模块类型:"
+    ["args.info.valid_types"]="(应为 open 或 proprietary)"
+    ["args.error.unknown_arg"]="未知选项:"
+    ["args.error.invalid_install_type"]="无效的安装类型:"
+    ["state.dir.error.create_state_dir"]="无法创建状态目录"
+    ["cleanup.success.state_file_deleted"]="状态文件已删除"
+    ["cleanup.success.rollback_file_deleted"]="回滚文件已删除"
+    ["cleanup.failed.starting"]="清理失败的安装状态..."
+    ["cleanup.failed.previous_state_found"]="发现之前的安装状态："
+    ["cleanup.failed.confirm_cleanup"]="是否清理这些状态文件？"
+    ["cleanup.failed.state_cleaned"]="安装状态已清理"
+    ["cleanup.failed.no_state_found"]="未发现失败的安装状态"
+    ["cleanup.success.starting"]="清理安装状态..."
+    ["cleanup.success.all_states_cleaned"]="安装完成，所有状态已清理"
+    ["rollback.starting"]="开始回滚安装..."
+    ["rollback.warning.changes_will_be_undone"]="这将撤销所有通过此脚本进行的更改"
+    ["rollback.confirm.proceed"]="是否继续回滚？"
+    ["rollback.info.executing"]="执行回滚"
+    ["rollback.warning.partial_failure"]="回滚操作失败"
+    ["rollback.error.rollback_file_missing"]="未找到回滚信息文件"
+    ["rollback.error.partial_failure"]="部分回滚操作失败，系统可能处于不一致状态"
+    ["rollback.success"]="回滚完成"
+    ["rollback.error.user_cancelled"]="用户取消回滚操作"
+    ["detect.os.starting"]="检测操作系统发行版..."
+    ["detect.os.error.unsupported_arch"]="仅支持 x86_64 和 aarch64，您当前架构为:"
+    ["detect.os.error.cannot_detect"]="无法检测操作系统发行版"
+    ["detect.os.success"]="检测到发行版:"
+    ["detect.gpu.starting"]="检查NVIDIA GPU并确定架构兼容性..."
+    ["detect.gpu.error.lspci_missing"]="lspci命令未找到，请安装pciutils包"
+    ["detect.gpu.error.no_gpu_found"]="未检测到NVIDIA GPU"
+    ["detect.gpu.success.detected"]="检测到NVIDIA GPU"
+    ["detect.gpu.success.support_open"]="支持开源内核模块"
+    ["detect.gpu.error.not_support_open"]="不支持开源内核模块"
+    ["detect.gpu.info.use_proprietary"]="将使用专有内核模块"
+    ["detect.gpu.warning.unknown_device_id"]="无法确定设备ID"
+    ["detect.gpu.old_gpu_found_warning"]="检测到不兼容开源驱动的GPU！"
+    ["detect.gpu.open_support_prompt"]="开源驱动支持情况："
+    ["detect.gpu.info.open_support_list"]="✅ 支持: Turing, Ampere, Ada Lovelace, Blackwell (RTX 16xx/20xx/30xx/40xx/50xx系列)"
+    ["detect.gpu.info.open_unsupport_list"]="❌ 不支持: Maxwell, Pascal, Volta (GTX 9xx/10xx系列, Tesla V100等)"
+    ["detect.gpu.incompatible.solution_prompt"]="解决方案："
+    ["detect.gpu.incompatible.solution_option1"]="1. 使用专有模块 (推荐)"
+    ["detect.gpu.incompatible.solution_option2"]="2. 仅针对兼容的GPU使用开源模块 (高级用户)"
+    ["detect.gpu.incompatible.confirm"]="是否切换到专有模块？"
+    ["detect.gpu.incompatible.switch"]="切换到专有内核模块"
+    ["detect.gpu.incompatible.continue_warning"]="继续使用开源模块，但可能导致部分GPU无法正常工作"
+    ["detect.gpu.incompatible.auto_mode_switch"]="自动化模式：切换到专有内核模块以确保兼容性"
+    ["detect.gpu.summary.header"]="GPU配置摘要:"
+    ["detect.gpu.summary.header.gpu_number"]="GPU编号"
+    ["detect.gpu.summary.header.architecture"]="架构"
+    ["detect.gpu.summary.header.module_type"]="模块类型"
+    ["detect.gpu.summary.value.open_module"]="开源模块"
+    ["detect.gpu.summary.value.proprietary_module_fallback"]="专有模块*"
+    ["detect.gpu.summary.value.proprietary_module"]="专有模块"
+    ["detect.gpu.summary.note.fallback"]="* 标记的GPU将回退到专有模块"
+    ["detect.distro_support.starting"]="检查发行版支持情况..."
+    ["detect.distro_support.warning.rhel7_eol"]="RHEL 7 已EOL，建议升级"
+    ["detect.distro_support.error.unsupported_rhel_version"]="不支持的RHEL版本:"
+    ["detect.distro_support.warning.fedora_unofficial"]="可能不是官方支持版本"
+    ["detect.distro_support.error.fedora_incompatible"]="可能不兼容"
+    ["detect.distro_support.warning.ubuntu1804_eol"]="Ubuntu 18.04 已EOL"
+    ["detect.distro_support.warning.ubuntu_maybe_supported"]="可能支持的Ubuntu版本:"
+    ["detect.distro_support.warning.ubuntu_unspecified"]="未明确支持的Ubuntu版本:"
+    ["detect.distro_support.warning.debian11_needs_tuning"]="Debian 11可能需要手动调整"
+    ["detect.distro_support.warning.debian_unspecified"]="未明确支持的Debian版本:"
+    ["detect.distro_support.warning.suse_maybe_supported"]="可能支持的SUSE版本:"
+    ["detect.distro_support.warning.amzn2_needs_tuning"]="Amazon Linux 2可能需要调整"
+    ["detect.distro_support.error.unsupported_amzn_version"]="不支持的Amazon Linux版本:"
+    ["detect.distro_support.warning.azure_maybe_supported"]="可能支持的Azure Linux版本:"
+    ["detect.distro_support.error.unsupported_kylin_version"]="未明确支持的麒麟操作系统版本"
+    ["detect.distro_support.error.unknown_distro"]="未知或不支持的发行版:"
+    ["detect.distro_support.success.fully_supported"]="发行版完全支持:"
+    ["detect.distro_support.warning.partially_supported"]="发行版部分支持:"
+    ["detect.distro_support.prompt.confirm.continue_install"]="是否继续安装？"
+    ["detect.distro_support.user_cancelled"]="用户取消安装"
+    ["detect.distro_support.error.unsupported"]="发行版不支持:"
+    ["detect.distro_support.info.supported_list_header"]="支持的发行版:"
+    ["detect.distro_support.prompt.confirm.force_install"]="是否强制继续安装？"
+    ["detect.distro_support.warning.force_mode_issues"]="强制安装模式，可能遇到兼容性问题"
+    ["detect.existing_driver.skipping_check"]="跳过现有驱动检查"
+    ["detect.existing_driver.starting"]="检查现有NVIDIA驱动安装..."
+    ["detect.existing_driver.warning.kernel_module_loaded"]="检测到已加载的NVIDIA内核模块："
+    ["detect.existing_driver.warning.pkg_manager_install"]="检测到通过包管理器安装的NVIDIA驱动："
+    ["detect.existing_driver.warning.runfile_install"]="检测到通过runfile安装的NVIDIA驱动"
+    ["detect.existing_driver.warning.ppa_found"]="检测到graphics-drivers PPA"
+    ["detect.existing_driver.warning.rpm_fusion_found"]="检测到RPM Fusion仓库"
+    ["detect.existing_driver.error.driver_found"]="检测到现有NVIDIA驱动安装！"
+    ["detect.existing_driver.info.install_method"]="安装方法:"
+    ["detect.existing_driver.prompt.user_choice"]="建议操作：\\n1. 卸载现有驱动后重新安装 (推荐)\\n2. 强制重新安装 (可能导致冲突)\\n3. 跳过检查继续安装 (高级用户)\\n4. 退出安装"
+    ["prompt.select_option.please_select"]="请选择操作"
+    ["prompt.select_option.existing_driver.choice_uninstall"]="卸载现有驱动后重新安装"
+    ["prompt.select_option.existing_driver.choice_force"]="强制重新安装"
+    ["prompt.select_option.existing_driver.choice_skip"]="跳过检查继续安装"
+    ["prompt.select_option.existing_driver.choice_exit"]="退出安装"
+    ["detect.existing_driver.warning.force_reinstall_mode"]="强制重新安装模式"
+    ["detect.existing_driver.warning.skip_mode"]="跳过现有驱动检查"
+    ["detect.existing_driver.exit.user_choice"]="用户选择退出以处理现有驱动"
+    ["detect.existing_driver.warning.auto_mode_uninstall"]="自动化模式：卸载现有驱动后重新安装"
+    ["detect.existing_driver.warning.force_mode_skip_uninstall"]="强制重新安装模式，跳过现有驱动处理"
+    ["detect.existing_driver.success.no_driver_found"]="未检测到现有NVIDIA驱动"
+    ["uninstall.existing_driver.starting"]="卸载现有NVIDIA驱动..."
+    ["uninstall.existing_driver.info.using_runfile_uninstaller"]="使用nvidia-uninstall卸载runfile安装的驱动"
+    ["uninstall.existing_driver.warning.runfile_uninstall_incomplete"]="runfile卸载可能不完整"
+    ["uninstall.existing_driver.info.removing_kernel_modules"]="卸载NVIDIA内核模块"
+    ["uninstall.existing_driver.warning.module_removal_failed"]="部分模块卸载失败，需要重启"
+    ["uninstall.existing_driver.success"]="现有驱动卸载完成"
+    ["secure_boot.check.starting"]="检测UEFI Secure Boot状态..."
+    ["secure_boot.check.method"]="检测方法"
+    ["secure_boot.check.disabled_or_unsupported"]="Secure Boot未启用或系统不支持UEFI"
+    ["secure_boot.check.warning"]="重要警告"
+    ["secure_boot.enabled.error_detected"]="检测到UEFI Secure Boot已启用！"
+    ["secure_boot.enabled.why_is_problem"]="为什么这是个问题？"
+    ["secure_boot.enabled.why_is_problem_detail"]="1. Secure Boot阻止加载未签名的内核模块\\n2. NVIDIA驱动包含内核模块，必须正确签名才能加载\\n3. 即使安装成功，驱动也无法工作，导致：\\n   • 黑屏或图形显示异常\\n   • CUDA/OpenCL不可用\\n   • 多显示器不工作\\n   • 系统可能无法启动"
+    ["secure_boot.enabled.solutions"]="推荐解决方案（选择其一）："
+    ["secure_boot.enabled.solution.disable"]="方案1: 禁用Secure Boot (最简单)"
+    ["secure_boot.enabled.solution.disable_steps"]="1. 重启进入BIOS/UEFI设置\\n2. 找到Security或Boot选项\\n3. 禁用Secure Boot\\n4. 保存并重启\\n5. 重新运行此脚本"
+    ["secure_boot.enabled.solution.sign"]="方案2: 使用MOK密钥签名 (保持Secure Boot)"
+    ["secure_boot.enabled.solution.sign_steps"]="1. 安装必要工具: mokutil, openssl, dkms\\n2. 生成Machine Owner Key (MOK)\\n3. 将MOK注册到UEFI固件\\n4. 配置DKMS自动签名NVIDIA模块\\n5. 重新运行此脚本"
+    ["secure_boot.enabled.solution.prebuilt"]="方案3: 使用预签名驱动 (如果可用)"
+    ["secure_boot.enabled.solution.prebuilt_steps"]="某些发行版提供预签名的NVIDIA驱动：\\n• Ubuntu: 可能通过ubuntu-drivers获得签名驱动\\n• RHEL: 可能有预编译的签名模块\\n• SUSE: 可能通过官方仓库获得"
+    ["secure_boot.enabled.solution.mok_setup"]="🔧 自动配置MOK密钥 (高级选项)"
+    ["secure_boot.enabled.solution.mok_setup_notice"]="此脚本可以帮助配置MOK密钥，但需要：\\n• 在重启时手动确认MOK密钥\\n• 记住设置的密码\\n• 理解Secure Boot的安全影响"
+    ["secure_boot.enabled.sign.detected"]="✓ 检测到现有MOK密钥文件"
+    ["secure_boot.enabled.advice_footer"]="强烈建议: 在解决Secure Boot问题之前，不要继续安装NVIDIA驱动！"
+    ["secure_boot.enabled.choose_action.prompt"]="请选择操作：\\n1. 退出安装，我将手动解决Secure Boot问题\\n2. 帮助配置MOK密钥 (高级用户)\\n3. 强制继续安装 (不推荐，可能导致系统问题)"
+    ["secure_boot.enabled.choice.exit"]="退出安装"
+    ["secure_boot.enabled.choice.sign"]="配置MOK密钥"
+    ["secure_boot.enabled.choice.force"]="强制继续安装"
+    ["secure_boot.enabled.exit.cancelled_user_fix"]="安装已取消，请解决Secure Boot问题后重新运行"
+    ["secure_boot.enabled.exit.useful_commands"]="有用的命令：\\n• 检查Secure Boot状态: mokutil --sb-state\\n• 检查现有MOK: mokutil --list-enrolled\\n• 检查NVIDIA模块: lsmod | grep nvidia"
+    ["secure_boot.enabled.exit.user_choice"]="用户选择退出以处理Secure Boot问题"
+    ["secure_boot.enabled.warning.user_forced_install"]="用户选择强制继续安装，可能导致驱动无法工作"
+    ["secure_boot.enabled.warning.auto_mode_existing_mok"]="自动化模式：检测到现有MOK密钥，继续安装"
+    ["secure_boot.enabled.error.auto_mode_failure"]="自动化模式下无法处理Secure Boot问题"
+    ["mok.setup.starting"]="配置MOK密钥签名..."
+    ["mok.setup.error.tools_missing"]="缺少必要工具:"
+    ["mok.setup.error.please_install_tools"]="请先安装这些工具："
+    ["mok.setup.info.using_ubuntu_key"]="使用现有Ubuntu/Debian MOK密钥"
+    ["mok.setup.info.using_dkms_key"]="使用现有DKMS MOK密钥"
+    ["mok.setup.info.generating_new_key"]="生成新的MOK密钥..."
+    ["mok.setup.error.generation_failed"]="MOK密钥生成失败"
+    ["mok.setup.success.generation_complete"]="MOK密钥生成完成"
+    ["mok.setup.info.enrolling_key"]="注册MOK密钥到UEFI固件..."
+    ["mok.setup.enroll.important_note_header"]="重要说明："
+    ["mok.setup.enroll.note"]="1. 系统将提示您输入一个一次性密码\\n2. 请记住这个密码，重启时需要使用\\n3. 建议使用简单的数字密码（考虑键盘布局）"
+    ["mok.setup.error.enroll_failed"]="MOK密钥注册失败"
+    ["mok.setup.success.enroll_queued"]="MOK密钥已排队等待注册"
+    ["mok.setup.next_steps.header"]="下一步操作："
+    ["mok.setup.enroll.next_steps"]="1. 脚本安装完成后，系统将重启\\n2. 重启时会出现MOK Manager界面\\n3. 选择 'Enroll MOK'\\n4. 选择 'Continue'\\n5. 选择 'Yes'\\n6. 输入刚才设置的密码\\n7. 系统将再次重启"
+    ["mok.setup.next_steps.warning_english_interface"]="注意：MOK Manager界面可能使用英文，请仔细操作"
+    ["dkms.signing.configuring"]="配置DKMS自动签名..."
+    ["dkms.signing.success"]="DKMS自动签名配置完成"
+    ["pre_check.starting"]="执行预安装检查..."
+    ["root.partition.space.insufficient"]="根分区可用空间不足1GB，可能影响安装"
+    ["pre_check.warning.vm_detected"]="检测到虚拟机环境:"
+    ["pre_check.vm.note"]="注意事项：\\n• 确保虚拟机已启用3D加速\\n• 某些虚拟机可能不支持NVIDIA GPU直通\\n• 容器环境可能需要特殊配置"
+    ["pre_check.warning.custom_kernel_detected"]="检测到自定义内核:"
+    ["pre_check.custom_kernel.note"]="自定义内核可能需要额外的DKMS配置"
+    ["pre_check.success"]="预安装检查完成"
+    ["repo.add.exists"]="仓库已存在，跳过添加"
+    ["repo.add.adding"]="添加仓库:"
+    ["pkg_install.info.installing_missing"]="安装缺失的包:"
+    ["pkg_install.info.all_packages_exist"]="所有包已安装，跳过安装步骤"
+    ["repo.enable.already_done"]="第三方仓库已启用，跳过此步骤"
+    ["repo.enable.starting"]="启用必要的仓库和依赖..."
+    ["repo.enable.error.rhel_appstream"]="无法启用appstream仓库"
+    ["repo.enable.error.rhel_baseos"]="无法启用baseos仓库"
+    ["repo.enable.error.rhel_crb"]="无法启用codeready-builder仓库"
+    ["repo.enable.error.suse_packagehub"]="无法启用PackageHub"
+    ["kernel_headers.install.already_done"]="内核头文件已安装，跳过此步骤"
+    ["kernel_headers.install.starting"]="安装内核头文件和开发包..."
+    ["repo.local.setup.starting"]="设置本地仓库安装..."
+    ["repo.local.setup.downloading"]="下载本地仓库包:"
+    ["repo.network.setup.starting"]="设置网络仓库..."
+    ["repo.network.setup.installing_keyring"]="下载并安装cuda-keyring"
+    ["repo.network.setup.keyring_exists"]="cuda-keyring已安装，跳过"
+    ["repo.nvidia.add.already_done"]="NVIDIA仓库已添加，跳过此步骤"
+    ["repo.nvidia.add.starting"]="添加NVIDIA官方仓库..."
+    ["dnf_module.enable.starting"]="启用DNF模块..."
+    ["nvidia_driver.install.starting"]="安装NVIDIA驱动"
+    ["nvidia_driver.type.open"]="开源模块"
+    ["nvidia_driver.type.proprietary"]="专有模块"
+    ["nouveau.disable.starting"]="禁用nouveau开源驱动..."
+    ["nouveau.disable.warning.detected_running"]="检测到nouveau驱动正在运行"
+    ["nouveau.disable.warning.processes_using_drm"]="个进程正在使用图形设备"
+    ["nouveau.disable.info.stopping_display_manager"]="尝试停止图形服务以释放nouveau驱动..."
+    ["nouveau.disable.info.stop_display_manager"]="停止显示管理器:"
+    ["nouveau.disable.warning.failed_stopping_display_manager"]="无法停止"
+    ["nouveau.disable.info.switching_to_text_mode"]="切换到文本模式..."
+    ["nouveau.disable.info.unloading_module"]="尝试卸载nouveau驱动模块..."
+    ["nouveau.disable.info.unload_module"]="尝试卸载模块:"
+    ["nouveau.disable.success.module_unloaded"]="成功卸载模块:"
+    ["nouveau.disable.warning.module_unload_failed"]="无法卸载模块:"
+    ["nouveau.disable.error.still_running_reboot_needed"]="nouveau模块仍在运行，需要重启系统才能完全禁用"
+    ["nouveau.disable.success.module_unloaded_all"]="nouveau模块已成功卸载"
+    ["nouveau.disable.info.not_running"]="nouveau驱动未运行"
+    ["nouveau.disable.info.creating_blacklist"]="创建nouveau黑名单配置..."
+    ["nouveau.disable.info.updating_initramfs"]="更新initramfs以确保nouveau在启动时被禁用..."
+    ["nouveau.disable.warning.initramfs_update_failed"]="更新initramfs失败，可能影响下次启动"
+    ["nouveau.disable.warning.dracut_missing"]="dracut命令未找到，无法更新initramfs"
+    ["nouveau.disable.info.restarting_display_manager"]="nouveau已禁用，重启显示服务..."
+    ["nouveau.disable.info.restart_display_manager"]="重启显示管理器"
+    ["nouveau.disable.warning.restart_failed"]="无法重启"
+    ["nouveau.disable.warning.reboot_required_final"]="nouveau驱动需要重启系统才能完全禁用"
+    ["nouveau.disable.error.reboot_needed_header"]="⚠️  重要提醒：需要重启系统"
+    ["nouveau.disable.error.reboot_needed_note"]="nouveau驱动仍在运行中，必须重启系统后才能继续安装NVIDIA驱动\\n这通常发生在以下情况：\\n• 有图形程序正在使用nouveau驱动\\n• nouveau模块被其他模块依赖\\n• 系统正在图形模式下运行"
+    ["nouveau.disable.info.auto_mode_reboot"]="自动化模式：保存当前状态，重启后将自动继续安装"
+    ["nouveau.disable.confirm.reboot_now"]="是否现在重启系统？重启后请重新运行安装脚本"
+    ["nouveau.disable.info.rebooting_now"]="正在重启系统，重启后请重新运行安装脚本..."
+    ["nouveau.disable.exit.user_refused_reboot"]="用户选择不重启，无法继续安装"
+    ["nouveau.disable.success.continue_install"]="nouveau驱动已成功禁用，继续安装NVIDIA驱动"
+    ["persistence_daemon.enable.starting"]="启用NVIDIA persistence daemon..."
+    ["persistence_daemon.enable.success"]="NVIDIA persistence daemon已启用"
+    ["persistence_daemon.enable.warning.service_not_found"]="nvidia-persistenced服务未找到"
+    ["verify.starting"]="验证NVIDIA驱动安装..."
+    ["verify.success.driver_loaded"]="NVIDIA驱动已加载:"
+    ["verify.warning.module_not_loaded"]="NVIDIA驱动模块未加载"
+    ["verify.success.smi_available"]="nvidia-smi工具可用"
+    ["verify.info.testing_driver"]="测试NVIDIA驱动功能..."
+    ["verify.success.driver_working"]="NVIDIA驱动工作正常！"
+    ["verify.error.smi_failed"]="nvidia-smi执行失败，驱动未正常工作"
+    ["verify.warning.smi_unavailable"]="nvidia-smi命令不可用"
+    ["verify.info.loaded_modules"]="已加载的NVIDIA模块:"
+    ["common.unknown"]="未知"
+    ["verify.info.module_version"]="模块版本:"
+    ["cleanup.install_files.starting"]="清理安装文件..."
+    ["final.success.header"]="NVIDIA驱动安装完成！"
+    ["final.summary.header"]="安装摘要:"
+    ["final.summary.distro"]="发行版"
+    ["final.summary.arch"]="架构"
+    ["final.summary.module_type"]="模块类型"
+    ["module.type.open_kernel"]="开源内核模块"
+    ["module.type.proprietary_kernel"]="专有内核模块"
+    ["repo.type.local"]="本地仓库"
+    ["repo.type.network"]="网络仓库"
+    ["final.next_steps.header"]="后续步骤:"
+    ["final.next_steps.working.note"]="1. ✅ 驱动已正常工作，可立即使用NVIDIA GPU\\n2. 如需安装CUDA Toolkit，请访问: https://docs.nvidia.com/cuda/cuda-installation-guide-linux/\\n3. 技术支持论坛: https://forums.developer.nvidia.com/c/gpu-graphics/linux/148\\n4. 如遇问题，可回滚安装，请运行"
+    ["final.next_steps.not_working.note"]="1. 重启系统以确保驱动完全生效\\n2. 重启后运行 'nvidia-smi' 验证安装\\n3. 如需安装CUDA Toolkit，请访问: https://docs.nvidia.com/cuda/cuda-installation-guide-linux/\\n4. 技术支持论坛: https://forums.developer.nvidia.com/c/gpu-graphics/linux/148\\n5. 如遇问题，可回滚安装，请运行"
+    ["final.next_steps.secure_boot.header"]="🔐 Secure Boot提醒："
+    ["final.next_steps.secure_boot.working"]="6. ✅ MOK密钥已正确配置，驱动正常工作"
+    ["final.next_steps.secure_boot.error"]="6. 重启时如果出现MOK Manager界面，请选择 'Enroll MOK' 并输入密码\\n7. 如果驱动无法加载，检查: sudo dmesg | grep nvidia\\n8. 验证模块签名: modinfo nvidia | grep sig"
+    ["final.notes.compute.header"]="计算专用安装说明:"
+    ["final.notes.compute.notes"]="- 此安装不包含桌面显卡组件 (OpenGL, Vulkan, X驱动等)\\n- 适用于计算集群或无显示器的工作站\\n- 如需添加桌面组件，可稍后安装相应包"
+    ["final.notes.desktop.header"]="桌面专用安装说明:"
+    ["final.notes.desktop.notes"]="- 此安装不包含CUDA计算组件\\n- 适用于纯桌面/游戏用途\\n- 如需CUDA支持，可稍后安装nvidia-driver-cuda包"
+    ["permission.error.root_required"]="此脚本需要root权限运行，请使用:"
+    ["main.info.non_interactive_quiet_mode"]="检测到非交互环境，启用静默模式"
+    ["main.header.title"]="NVIDIA驱动一键安装脚本"
+    ["main.header.auto_mode_subtitle"]="无交互自动化模式"
+    ["main.resume.warning_incomplete_state_found"]="检测到未完成的安装状态:"
+    ["main.resume.confirm_resume_install"]="是否从上次中断处继续安装？"
+    ["main.resume.info_resuming"]="从断点继续安装"
+    ["main.resume.info_restarting"]="清理状态文件并重新开始"
+    ["main.config_summary.header"]="安装配置:"
+    ["main.config_summary.distro"]="发行版:"
+    ["main.config_summary.module_type"]="模块类型:"
+    ["main.config_summary.install_type"]="安装类型:"
+    ["main.config_summary.repo_type"]="仓库类型:"
+    ["main.config_summary.auto_mode"]="自动化模式:"
+    ["main.config_summary.force_reinstall"]="强制重装:"
+    ["main.config_summary.auto_reboot"]="自动重启:"
+    ["common.yes"]="是"
+    ["common.no"]="否"
+    ["main.config_summary.confirm"]="是否继续安装？"
+    ["main.config_summary.user_cancel"]="用户取消安装"
+    ["main.install.starting"]="开始NVIDIA驱动安装过程..."
+    ["main.reboot_logic.success_no_reboot_needed"]="🎉 NVIDIA驱动安装成功并正常工作！"
+    ["main.reboot_logic.success_smi_passed"]="nvidia-smi测试通过，驱动已可正常使用，无需重启系统。"
+    ["main.reboot_logic.info_rebooting_on_user_request"]="尽管驱动已正常工作，但用户启用了自动重启选项"
+    ["main.reboot_logic.info_rebooting_now"]="正在重启系统..."
+    ["main.reboot_logic.success_auto_mode_no_reboot"]="自动化模式：驱动安装完成，无需重启"
+    ["main.reboot_logic.confirm_optional_reboot"]="驱动已正常工作，是否仍要重启系统？"
+    ["main.reboot_logic.info_reboot_skipped"]="已跳过重启，可立即使用NVIDIA驱动"
+    ["main.reboot_logic.warning_reboot_required"]="⚠️  NVIDIA驱动需要重启系统才能正常工作"
+    ["main.reboot_logic.warning_smi_failed_reboot_required"]="nvidia-smi测试失败，必须重启系统以完成驱动安装。"
+    ["main.reboot_logic.reason_nouveau"]="原因：nouveau驱动无法完全卸载"
+    ["main.reboot_logic.reason_module_load"]="原因：NVIDIA驱动模块需要重启后才能正常加载"
+    ["main.reboot_logic.info_auto_mode_rebooting"]="自动重启模式：正在重启系统..."
+    ["main.reboot_logic.confirm_reboot_now"]="是否现在重启系统？"
+    ["main.reboot_logic.warning_manual_reboot_needed"]="请手动重启系统以完成驱动安装"
+    ["main.reboot_logic.info_verify_after_reboot"]="重启后可运行 'nvidia-smi' 验证驱动是否正常工作"
+)
+
+# ================ 语言包结束 ===================
+
+gettext() {
+    local msgid="$1"
+    # 根据当前语言获取翻译
+    case "$LANG_CURRENT" in
+        "zh-cn"|"zh"|"zh_CN")
+            translation="${LANG_PACK_ZH_CN[$msgid]:-}"
+            ;;
+        *)
+            # 默认使用中文
+            translation="${LANG_PACK_ZH_CN[$msgid]:-}"
+            ;;
+    esac
+    
+    # 如果没有找到翻译，返回key本身
+    if [[ -z "$translation" ]]; then
+        translation="$msgid"
+    fi
+    
+    echo "$translation"
+}
 
 # 优雅退出处理
 cleanup_on_exit() {
     local exit_code=$?
     local signal="${1:-EXIT}"
-    
-    log_debug "收到信号: $signal, 退出码: $exit_code"
-    
+
+    log_debug "$(gettext "exit.handler.receive_signal") $signal, $(gettext "exit.handler.exit_code") $exit_code"
+
     # 如果是被信号中断，记录中断信息
     if [[ "$signal" != "EXIT" ]]; then
-        log_warning "脚本被信号 $signal 中断"
-        
+        log_warning "$(gettext "exit.handler.script_interrupted") $signal"
+
         # 保存中断状态
         if [[ -d "$STATE_DIR" ]]; then
             echo "INTERRUPTED=true" >> "$STATE_DIR/last_exit_code"
@@ -150,7 +527,7 @@ cleanup_on_exit() {
     
     # 如果安装过程中被中断，保存当前状态
     if [[ "$signal" != "EXIT" ]] && [[ -f "$STATE_FILE" ]]; then
-        log_info "保存中断状态，可使用相同命令继续安装"
+        log_info $(gettext "exit.handler.state_saved_for_resume")
     fi
     
     # 释放可能的锁文件
@@ -172,7 +549,7 @@ cleanup_on_exit() {
 
 # 清理临时文件
 cleanup_temp_files() {
-    log_debug "开始清理临时文件..."
+    log_debug $(gettext "exit.handler.temp_files_starting")
     find /tmp -maxdepth 1 \( \
         -name "nvidia-driver-local-repo-*.rpm" -o \
         -name "nvidia-driver-local-repo-*.deb" -o \
@@ -191,7 +568,7 @@ cleanup_lock_files() {
     
     for lock_file in "${lock_files[@]}"; do
         if [[ -f "$lock_file" ]]; then
-            log_debug "释放锁文件: $lock_file"
+            log_debug "$(gettext "clean.release_lock_file") $lock_file"
             rm -f "$lock_file"
         fi
     done
@@ -204,15 +581,15 @@ create_install_lock() {
     if [[ -f "$lock_file" ]]; then
         local lock_pid=$(cat "$lock_file" 2>/dev/null)
         if [[ -n "$lock_pid" ]] && kill -0 "$lock_pid" 2>/dev/null; then
-            exit_with_code $EXIT_STATE_FILE_CORRUPTED "另一个安装进程正在运行 (PID: $lock_pid)"
+            exit_with_code $EXIT_STATE_FILE_CORRUPTED "$(gettext "state.lock.error.another_install_running") $lock_pid"
         else
-            log_warning "发现孤立的锁文件，将清理"
+            log_warning $(gettext "state.lock.cleaning_orphaned_file")
             rm -f "$lock_file"
         fi
     fi
     
     echo $$ > "$lock_file"
-    log_debug "创建安装锁: $lock_file (PID: $$)"
+    log_debug "$(gettext "state.lock.created") $lock_file (PID: $$)"
 }
 
 # 设置信号处理
@@ -229,7 +606,7 @@ exit_with_code() {
     
     # 在调试模式下显示退出码
     if [[ "${DEBUG:-false}" == "true" ]]; then
-        log_debug "退出码: $exit_code"
+        log_debug "$(gettext "exit.code.prompt") $exit_code"
     fi
     
     # 保存退出码到状态文件供外部查询
@@ -246,43 +623,43 @@ exit_with_code() {
 get_exit_code_description() {
     local code=$1
     case $code in
-        0) echo "成功完成" ;;
-        1) echo "非root权限运行" ;;
-        2) echo "文件系统权限不足" ;;
-        3) echo "状态目录创建失败" ;;
-        10) echo "未检测到NVIDIA GPU" ;;
-        11) echo "lspci命令不可用" ;;
-        12) echo "GPU架构不兼容" ;;
-        20) echo "不支持的操作系统" ;;
-        21) echo "不支持的发行版版本" ;;
-        22) echo "不支持的系统架构" ;;
-        30) echo "无效的命令行参数" ;;
-        31) echo "无效的安装类型" ;;
-        32) echo "模块类型与GPU架构不匹配" ;;
-        40) echo "Secure Boot启用，用户选择退出" ;;
-        41) echo "Secure Boot启用，自动化模式无法处理" ;;
-        42) echo "MOK密钥操作失败" ;;
-        43) echo "缺少MOK管理工具" ;;
-        50) echo "现有驱动冲突，用户选择退出" ;;
-        51) echo "现有驱动卸载失败" ;;
-        52) echo "nouveau驱动禁用失败" ;;
-        60) echo "网络连接失败" ;;
-        61) echo "仓库下载失败" ;;
-        62) echo "CUDA keyring下载失败" ;;
-        70) echo "包管理器不可用" ;;
-        71) echo "仓库添加失败" ;;
-        72) echo "依赖包安装失败" ;;
-        73) echo "内核头文件安装失败" ;;
-        74) echo "NVIDIA驱动安装失败" ;;
-        80) echo "内核版本问题" ;;
-        81) echo "DKMS构建失败" ;;
-        82) echo "模块签名失败" ;;
-        83) echo "驱动验证失败" ;;
-        90) echo "回滚文件缺失" ;;
-        91) echo "回滚操作失败" ;;
-        92) echo "状态文件损坏" ;;
-        100) echo "用户取消安装" ;;
-        *) echo "未知错误码: $code" ;;
+        0) echo $(gettext "exit_code.success") ;;
+        1) echo $(gettext "exit_code.permission.no_root") ;;
+        2) echo $(gettext "exit_code.permission.fs_denied") ;;
+        3) echo $(gettext "exit_code.permission.state_dir_failed") ;;
+        10) echo $(gettext "exit_code.hardware.no_gpu_detected") ;;
+        11) echo $(gettext "exit_code.hardware.lspci_unavailable") ;;
+        12) echo $(gettext "exit_code.hardware.gpu_arch_incompatible") ;;
+        20) echo $(gettext "exit_code.compatibility.unsupported_os") ;;
+        21) echo $(gettext "exit_code.compatibility.unsupported_version") ;;
+        22) echo $(gettext "exit_code.compatibility.unsupported_arch") ;;
+        30) echo $(gettext "exit_code.config.invalid_args") ;;
+        31) echo $(gettext "exit_code.config.invalid_install_type") ;;
+        32) echo $(gettext "exit_code.config.module_arch_mismatch") ;;
+        40) echo $(gettext "exit_code.secure_boot.user_exit") ;;
+        41) echo $(gettext "exit_code.secure_boot.auto_failed") ;;
+        42) echo $(gettext "exit_code.secure_boot.mok_operation_failed") ;;
+        43) echo $(gettext "exit_code.secure_boot.mok_tools_missing") ;;
+        50) echo $(gettext "exit_code.conflict.existing_driver_user_exit") ;;
+        51) echo $(gettext "exit_code.conflict.driver_uninstall_failed") ;;
+        52) echo $(gettext "exit_code.conflict.nouveau_disable_failed") ;;
+        60) echo $(gettext "exit_code.network.connection_failed") ;;
+        61) echo $(gettext "exit_code.network.repo_download_failed") ;;
+        62) echo $(gettext "exit_code.network.keyring_download_failed") ;;
+        70) echo $(gettext "exit_code.pkg_manager.unavailable") ;;
+        71) echo $(gettext "exit_code.pkg_manager.repo_add_failed") ;;
+        72) echo $(gettext "exit_code.pkg_manager.dependency_install_failed") ;;
+        73) echo $(gettext "exit_code.pkg_manager.kernel_headers_failed") ;;
+        74) echo $(gettext "exit_code.pkg_manager.nvidia_install_failed") ;;
+        80) echo $(gettext "exit_code.pkg_manager.kernel_version_issue") ;;
+        81) echo $(gettext "exit_code.pkg_manager.dkms_build_failed") ;;
+        82) echo $(gettext "exit_code.pkg_manager.module_signing_failed") ;;
+        83) echo $(gettext "exit_code.pkg_manager.driver_validation_failed") ;;
+        90) echo $(gettext "exit_code.pkg_manager.rollback_file_missing") ;;
+        91) echo $(gettext "exit_code.pkg_manager.rollback_failed") ;;
+        92) echo $(gettext "exit_code.state_management.state_file_corrupted") ;;
+        100) echo $(gettext "exit_code.user_cancelled") ;;
+        *) echo "$(gettext "exit_code.unknown") $code" ;;
     esac
 }
 
@@ -323,7 +700,7 @@ confirm() {
     local default="${2:-N}"
 
     if [[ "$AUTO_YES" == "true" ]]; then
-        log_debug "自动确认: $prompt -> Y"
+        log_debug "$(gettext "auto_yes.prompt") $prompt -> Y"
         return 0
     fi
     
@@ -344,7 +721,7 @@ select_option() {
     local options=("$@")
 
     if [[ "$AUTO_YES" == "true" ]]; then
-        log_debug "自动选择: $prompt -> $default"
+        log_debug "$(gettext "auto_yes.prompt") $prompt -> $default"
         echo "$default"
         return 0
     fi
@@ -356,7 +733,7 @@ select_option() {
     echo
     
     while true; do
-        read -p "请选择 (1-${#options[@]}, 默认: $default): " -r choice
+        read -p "$(gettext "select_option.prompt.range") (1-${#options[@]}, $(gettext "select_option.prompt.default"): $default): " -r choice
         
         # 如果用户直接回车，使用默认值
         if [[ -z "$choice" ]]; then
@@ -368,7 +745,7 @@ select_option() {
             echo "$choice"
             return 0
         else
-            echo "无效选择，请输入 1-${#options[@]} 之间的数字"
+            echo "$(gettext "select_option.prompt.invalid_choice") 1-${#options[@]}"
         fi
     done
 }
@@ -430,6 +807,7 @@ EOF
 }
 
 # 显示退出码信息
+# 显示退出码信息
 show_exit_codes() {
     cat << 'EOF'
 NVIDIA驱动安装脚本 - 退出码说明
@@ -452,80 +830,79 @@ NVIDIA驱动安装脚本 - 退出码说明
 
 详细退出码列表：
 
-权限和环境错误 (1-9):
-  1  - 非root权限运行
-  2  - 文件系统权限不足
-  3  - 状态目录创建失败
+EOF
 
-硬件检测错误 (10-19):
-  10 - 未检测到NVIDIA GPU
-  11 - lspci命令不可用
-  12 - GPU架构不兼容
+    echo $(gettext "exit_code.permission")
+    for code in 1 2 3; do
+        printf "  %-3s - %s\n" "$code" "$(get_exit_code_description $code)"
+    done
+    echo
 
-系统兼容性错误 (20-29):
-  20 - 不支持的操作系统
-  21 - 不支持的发行版版本
-  22 - 不支持的系统架构
+    echo $(gettext "exit_code.hardware")
+    for code in 10 11 12; do
+        printf "  %-3s - %s\n" "$code" "$(get_exit_code_description $code)"
+    done
+    echo
 
-参数和配置错误 (30-39):
-  30 - 无效的命令行参数
-  31 - 无效的安装类型
-  32 - 模块类型与GPU架构不匹配
+    echo $(gettext "exit_code.compatibility")
+    for code in 20 21 22; do
+        printf "  %-3s - %s\n" "$code" "$(get_exit_code_description $code)"
+    done
+    echo
 
-Secure Boot相关错误 (40-49):
-  40 - Secure Boot启用，用户选择退出
-  41 - Secure Boot启用，自动化模式无法处理
-  42 - MOK密钥操作失败
-  43 - 缺少MOK管理工具
+    echo $(gettext "exit_code.config")
+    for code in 30 31 32; do
+        printf "  %-3s - %s\n" "$code" "$(get_exit_code_description $code)"
+    done
+    echo
 
-现有驱动冲突 (50-59):
-  50 - 现有驱动冲突，用户选择退出
-  51 - 现有驱动卸载失败
-  52 - nouveau驱动禁用失败
+    echo $(gettext "exit_code.secure_boot")
+    for code in 40 41 42 43; do
+        printf "  %-3s - %s\n" "$code" "$(get_exit_code_description $code)"
+    done
+    echo
 
-网络和下载错误 (60-69):
-  60 - 网络连接失败
-  61 - 仓库下载失败
-  62 - CUDA keyring下载失败
+    echo $(gettext "exit_code.conflict")
+    for code in 50 51 52; do
+        printf "  %-3s - %s\n" "$code" "$(get_exit_code_description $code)"
+    done
+    echo
 
-包管理器错误 (70-79):
-  70 - 包管理器不可用
-  71 - 仓库添加失败
-  72 - 依赖包安装失败
-  73 - 内核头文件安装失败
-  74 - NVIDIA驱动安装失败
+    echo $(gettext "exit_code.network")
+    for code in 60 61 62; do
+        printf "  %-3s - %s\n" "$code" "$(get_exit_code_description $code)"
+    done
+    echo
 
-系统状态错误 (80-89):
-  80 - 内核版本问题
-  81 - DKMS构建失败
-  82 - 模块签名失败
-  83 - 驱动验证失败
+    echo $(gettext "exit_code.pkg_manager")
+    for code in 70 71 72 73 74; do
+        printf "  %-3s - %s\n" "$code" "$(get_exit_code_description $code)"
+    done
+    echo
 
-状态管理错误 (90-99):
-  90 - 回滚文件缺失
-  91 - 回滚操作失败
-  92 - 状态文件损坏
+    echo $(gettext "exit_code.system_state")
+    for code in 80 81 82 83; do
+        printf "  %-3s - %s\n" "$code" "$(get_exit_code_description $code)"
+    done
+    echo
 
-用户取消 (100-109):
-  100 - 用户取消安装
+    echo $(gettext "exit_code.state_management")
+    for code in 90 91 92; do
+        printf "  %-3s - %s\n" "$code" "$(get_exit_code_description $code)"
+    done
+    echo
 
+    echo $(gettext "exit_code.user_cancelled")
+    for code in 100; do
+        printf "  %-3s - %s\n" "$code" "$(get_exit_code_description $code)"
+    done
+    echo
+
+    cat << 'EOF'
 ═══════════════════════════════════════════════════════════════
 
-外部处理示例:
-
-# Bash脚本处理
-./install_nvidia.sh -y
-case $? in
-  0) echo "安装成功" ;;
-  10) echo "无GPU，跳过" ;;
-  40) echo "Secure Boot问题" ;;
-  60-69) echo "网络问题，可重试" ;;
-  *) echo "其他错误" ;;
-esac
-
-# 查看最后的退出码
-cat /var/lib/nvidia-installer/last_exit_code
-
+You can find the last exit code in the file:
+    /var/lib/nvidia-installer/last_exit_code
 EOF
 }
 
@@ -547,7 +924,7 @@ parse_arguments() {
                 elif [[ "$2" == "open" ]]; then
                     USE_OPEN_MODULES=true
                 else
-                    exit_with_code $EXIT_INVALID_ARGS "无效的模块类型: $2 (应为 open 或 proprietary)"
+                    exit_with_code $EXIT_INVALID_ARGS "$(gettext "args.error.invalid_module_type") $2 $(gettext "args.info.valid_types")"
                 fi
                 shift 2
                 ;;
@@ -592,7 +969,7 @@ parse_arguments() {
                 exit 0
                 ;;
             *)
-                exit_with_code $EXIT_INVALID_ARGS "未知选项: $1"
+                exit_with_code $EXIT_INVALID_ARGS "$(gettext "args.error.unknown_arg") $1"
                 ;;
         esac
     done
@@ -628,14 +1005,14 @@ parse_arguments() {
 
     # 验证安装类型
     if [[ ! "$INSTALL_TYPE" =~ ^(full|compute-only|desktop-only)$ ]]; then
-        exit_with_code $EXIT_INVALID_INSTALL_TYPE "无效的安装类型: $INSTALL_TYPE"
+        exit_with_code $EXIT_INVALID_INSTALL_TYPE "$(gettext "args.error.invalid_install_type") $INSTALL_TYPE"
     fi
     
     # 自动化模式下的合理默认值
     if [[ "$AUTO_YES" == "true" ]]; then
-        log_debug "自动化模式已启用"
+        log_debug $(gettext "args.info.auto_mode_enabled")
         if [[ "$QUIET_MODE" == "true" ]]; then
-            log_debug "静默模式已启用"
+            log_debug $(gettext "args.info.quiet_mode_enabled")
         fi
     fi
 }
@@ -643,7 +1020,7 @@ parse_arguments() {
 # 状态管理函数
 create_state_dir() {
     if ! mkdir -p "$STATE_DIR" 2>/dev/null; then
-        exit_with_code $EXIT_STATE_DIR_FAILED "无法创建状态目录: $STATE_DIR"
+        exit_with_code $EXIT_STATE_DIR_FAILED "$(gettext "state.dir.error.create_state_dir") $STATE_DIR"
     fi
     chmod 755 "$STATE_DIR"
     
@@ -678,78 +1055,78 @@ save_rollback_info() {
 
 # 清理失败的安装状态
 cleanup_failed_install() {
-    log_info "清理失败的安装状态..."
+    log_info $(gettext "cleanup.failed.starting")
     
     if [[ -f "$STATE_FILE" ]]; then
-        log_info "发现之前的安装状态："
+        log_info $(gettext "cleanup.failed.previous_state_found")
         if [[ "$QUIET_MODE" != "true" ]]; then
             cat "$STATE_FILE"
         fi
         
-        if confirm "是否清理这些状态文件？" "N"; then
+        if confirm $(gettext "cleanup.failed.confirm_cleanup") "N"; then
             rm -f "$STATE_FILE" "$ROLLBACK_FILE"
-            log_success "安装状态已清理"
+            log_success $(gettext "cleanup.failed.state_cleaned")
         fi
     else
-        log_info "未发现失败的安装状态"
+        log_info $(gettext "cleanup.failed.no_state_found")
     fi
 }
 
 cleanup_after_success() {
-    log_info "清理安装状态..."
+    log_info $(gettext "cleanup.success.starting")
     
     # 删除状态文件和回滚文件
     if [[ -f "$STATE_FILE" ]]; then
         rm -f "$STATE_FILE"
-        log_success "状态文件已删除: $STATE_FILE"
+        log_success "$(gettext "cleanup.success.state_file_deleted") $STATE_FILE"
     fi
     
     if [[ -f "$ROLLBACK_FILE" ]]; then
         rm -f "$ROLLBACK_FILE"
-        log_success "回滚文件已删除: $ROLLBACK_FILE"
+        log_success "$(gettext "cleanup.success.rollback_file_deleted") $ROLLBACK_FILE"
     fi
     
     # 清理临时文件
     cleanup_temp_files
     
-    log_success "安装完成，所有状态已清理"
+    log_success $(gettext "cleanup.success.all_states_cleaned")
 }
 
 # 回滚安装
 rollback_installation() {
-    log_info "开始回滚安装..."
+    log_info $(gettext "rollback.starting")
     
     if [[ ! -f "$ROLLBACK_FILE" ]]; then
-        exit_with_code $EXIT_ROLLBACK_FILE_MISSING "未找到回滚信息文件: $ROLLBACK_FILE"
+        exit_with_code $EXIT_ROLLBACK_FILE_MISSING "$(gettext "rollback.error.rollback_file_missing") $ROLLBACK_FILE"
     fi
     
-    log_warning "这将撤销所有通过此脚本进行的更改"
-    if confirm "是否继续回滚？" "N"; then
+    log_warning $(gettext "rollback.warning.changes_will_be_undone")
+    if confirm $(gettext "rollback.confirm.proceed") "N"; then
         # 从后往前执行回滚操作
         local rollback_failed=false
         tac "$ROLLBACK_FILE" | while read -r action; do
-            log_info "执行回滚: $action"
+            log_info "$(gettext "rollback.info.executing") $action"
             if ! eval "$action"; then
-                log_warning "回滚操作失败: $action"
+                log_warning "$(gettext "rollback.warning.partial_failure") $action"
                 rollback_failed=true
             fi
         done
 
         if [[ "$rollback_failed" == "true" ]]; then
-            exit_with_code $EXIT_ROLLBACK_FAILED "部分回滚操作失败，系统可能处于不一致状态"
+            exit_with_code $EXIT_ROLLBACK_FAILED $(gettext "rollback.error.partial_failure")
         fi
         
         # 清理状态文件
         rm -f "$STATE_FILE" "$ROLLBACK_FILE"
-        log_success "回滚完成"
+        log_success $(gettext "rollback.success")
     else
-        exit_with_code $EXIT_USER_CANCELLED "用户取消回滚操作"
+        exit_with_code $EXIT_USER_CANCELLED $(gettext "rollback.error.user_cancelled")
     fi
 }
 
 # 检测操作系统发行版
 detect_distro() {
-    log_step "检测操作系统发行版..."
+    log_step $(gettext "detect.os.starting")
     
     if [[ -f /etc/os-release ]]; then
         source /etc/os-release
@@ -764,12 +1141,12 @@ detect_distro() {
         elif [[ "$ARCH" == "aarch64" ]]; then
             ARCH="sbsa"
         else
-            exit_with_code $EXIT_UNSUPPORTED_ARCH "不支持的架构: $ARCH (仅支持 x86_64 和 aarch64)"
+            exit_with_code $EXIT_UNSUPPORTED_ARCH "$(gettext "detect.os.error.unsupported_arch") $ARCH"
         fi
-        
-        log_success "检测到发行版: $NAME ($DISTRO_ID $DISTRO_VERSION) [$ARCH]"
+
+        log_success "$(gettext "detect.os.success") $NAME ($DISTRO_ID $DISTRO_VERSION) [$ARCH]"
     else
-        exit_with_code $EXIT_UNSUPPORTED_OS "无法检测操作系统发行版"
+        exit_with_code $EXIT_UNSUPPORTED_OS "$(gettext "detect.os.error.cannot_detect")"
     fi
 }
 
@@ -898,14 +1275,14 @@ is_open_module_supported() {
 
 # 检查NVIDIA GPU并确定架构兼容性
 check_nvidia_gpu() {
-    log_step "检查NVIDIA GPU并确定架构兼容性..."
+    log_step $(gettext "detect.gpu.starting")
     
     if ! command -v lspci &> /dev/null; then
-        exit_with_code $EXIT_LSPCI_UNAVAILABLE "lspci命令未找到，请安装pciutils包"
+        exit_with_code $EXIT_LSPCI_UNAVAILABLE $(gettext "detect.gpu.error.lspci_missing")
     fi
     
     if ! lspci | grep -i nvidia > /dev/null 2>&1; then
-        exit_with_code $EXIT_NO_NVIDIA_GPU "未检测到NVIDIA GPU"
+        exit_with_code $EXIT_NO_NVIDIA_GPU $(gettext "detect.gpu.error.no_gpu_found")
     fi
     
     # 初始化GPU数据库
@@ -920,8 +1297,8 @@ check_nvidia_gpu() {
         ((++gpu_count))
         local gpu_info=$(echo "$line" | grep -E "(VGA|3D controller)")
         if [[ -n "$gpu_info" ]]; then
-            log_success "检测到NVIDIA GPU #$gpu_count: $gpu_info"
-            
+            log_success "$(gettext "detect.gpu.success.detected") #$gpu_count: $gpu_info"
+
             # 提取设备ID
             local pci_address=$(echo "$line" | awk '{print $1}')
             local device_id=$(lspci -s "$pci_address" -nn | grep -oP '10de:\K[0-9a-fA-F]{4}' | tr '[:lower:]' '[:upper:]')
@@ -929,22 +1306,19 @@ check_nvidia_gpu() {
             if [[ -n "$device_id" ]]; then
                 local architecture=$(detect_gpu_architecture "$device_id")
                 detected_architectures+=("$architecture")
-                
-                log_info "GPU #$gpu_count 设备ID: $device_id, 架构: $architecture"
-                
                 # 检查模块兼容性
                 if [[ "$USE_OPEN_MODULES" == "true" ]]; then
                     if is_open_module_supported "$architecture"; then
-                        log_success "GPU #$gpu_count ($architecture) 支持开源内核模块"
+                        log_success "GPU #$gpu_count ($architecture) $(gettext "detect.gpu.success.support_open")"
                     else
-                        log_error "GPU #$gpu_count ($architecture) 不支持开源内核模块"
+                        log_error "GPU #$gpu_count ($architecture) $(gettext "detect.gpu.error.not_support_open")"
                         has_incompatible_gpu=true
                     fi
                 else
-                    log_info "GPU #$gpu_count ($architecture) 将使用专有内核模块"
+                    log_info "GPU #$gpu_count ($architecture) $(gettext "detect.gpu.info.use_proprietary")"
                 fi
             else
-                log_warning "无法确定GPU #$gpu_count 的设备ID"
+                log_warning "GPU #$gpu_count $(gettext "detect.gpu.warning.unknown_device_id")"
                 if [[ "$USE_OPEN_MODULES" == "true" ]]; then
                     has_incompatible_gpu=true
                 fi
@@ -953,41 +1327,41 @@ check_nvidia_gpu() {
     done < <(lspci | grep -i nvidia)
     
     if [[ $gpu_count -eq 0 ]]; then
-        exit_with_code $EXIT_NO_NVIDIA_GPU "未检测到NVIDIA GPU"
+        exit_with_code $EXIT_NO_NVIDIA_GPU $(gettext "detect.gpu.error.no_gpu_found")
     fi
     
     # 处理兼容性问题
     if [[ "$USE_OPEN_MODULES" == "true" ]] && [[ "$has_incompatible_gpu" == "true" ]]; then
         echo
-        log_error "检测到不兼容开源模块的GPU！"
-        echo -e "${RED}开源模块支持情况：${NC}"
-        echo "✅ 支持: Turing, Ampere, Ada Lovelace, Blackwell (RTX 16xx/20xx/30xx/40xx/50xx系列)"
-        echo "❌ 不支持: Maxwell, Pascal, Volta (GTX 9xx/10xx系列, Tesla V100等)"
+        log_error $(gettext "detect.gpu.old_gpu_found_warning")
+        echo -e "${RED}$(gettext "detect.gpu.open_support_prompt")${NC}"
+        echo $(gettext "detect.gpu.info.open_support_list")
+        echo $(gettext "detect.gpu.info.open_unsupport_list")
         echo
 
         if ! [[ "$AUTO_YES" == "true" ]]; then
-            echo "解决方案："
-            echo "1. 使用专有模块 (推荐)"
-            echo "2. 仅针对兼容的GPU使用开源模块 (高级用户)"
+            echo $(gettext "detect.gpu.incompatible.solution_prompt")
+            echo $(gettext "detect.gpu.incompatible.solution_option1")
+            echo $(gettext "detect.gpu.incompatible.solution_option2")
             echo
             
-            if confirm "是否切换到专有模块？" "Y"; then
-                log_info "切换到专有内核模块"
+            if confirm $(gettext "detect.gpu.incompatible.confirm") "Y"; then
+                log_info $(gettext "detect.gpu.incompatible.switch")
                 USE_OPEN_MODULES=false
             else
-                log_warning "继续使用开源模块，但可能导致部分GPU无法正常工作"
+                log_warning $(gettext "detect.gpu.incompatible.continue_warning")
             fi
         else
             # 自动化模式下的默认行为：切换到专有模块
-            log_warning "自动化模式：切换到专有内核模块以确保兼容性"
+            log_warning $(gettext "detect.gpu.incompatible.auto_mode_switch")
             USE_OPEN_MODULES=false
         fi
     fi
     
     # 显示最终配置摘要
     echo
-    log_info "GPU配置摘要:"
-    printf "%-15s %-20s %-15s\n" "GPU编号" "架构" "模块类型"
+    log_info $(gettext "detect.gpu.summary.header")
+    printf "%-15s %-20s %-15s\n" $(gettext "detect.gpu.summary.header.gpu_number") $(gettext "detect.gpu.summary.header.architecture") $(gettext "detect.gpu.summary.header.module_type")
     printf "%-15s %-20s %-15s\n" "-------" "--------" "--------"
     
     for i in "${!detected_architectures[@]}"; do
@@ -996,12 +1370,12 @@ check_nvidia_gpu() {
 
         if [[ "$USE_OPEN_MODULES" == "true" ]]; then
             if is_open_module_supported "$arch"; then
-                module_type="开源模块"
+                module_type=$(gettext "detect.gpu.summary.value.open_module")
             else
-                module_type="专有模块*"
+                module_type=$(gettext "detect.gpu.summary.value.proprietary_module_fallback")
             fi
         else
-            module_type="专有模块"
+            module_type=$(gettext "detect.gpu.summary.value.proprietary_module")
         fi
         
         printf "%-15s %-20s %-15s\n" "#$((i+1))" "$arch" "$module_type"
@@ -1009,13 +1383,13 @@ check_nvidia_gpu() {
     
     if [ "$USE_OPEN_MODULES" = true ] && [ "$has_incompatible_gpu" = true ]; then
         echo
-        log_warning "* 标记的GPU将回退到专有模块"
+        log_warning $(gettext "detect.gpu.summary.note.fallback")
     fi
 }
 
 # 智能发行版版本检查
 check_distro_support() {
-    log_step "检查发行版支持情况..."
+    log_step $(gettext "detect.distro_support.starting")
     
     local is_supported=true
     local support_level="full"  # full, partial, unsupported
@@ -1025,8 +1399,8 @@ check_distro_support() {
         rhel|rocky|ol|almalinux)
             case $DISTRO_VERSION in
                 8|9|10) support_level="full" ;;
-                7) support_level="partial"; warning_msg="RHEL 7 已EOL，建议升级" ;;
-                *) support_level="unsupported"; warning_msg="不支持的RHEL版本: $DISTRO_VERSION" ;;
+                7) support_level="partial"; warning_msg=$(gettext "detect.distro_support.warning.rhel7_eol") ;;
+                *) support_level="unsupported"; warning_msg="$(gettext "detect.distro_support.error.unsupported_rhel_version") $DISTRO_VERSION" ;;
             esac
             ;;
         fedora)
@@ -1035,26 +1409,26 @@ check_distro_support() {
                 support_level="full"
             elif [[ $version_num -ge 35 && $version_num -lt 39 ]]; then
                 support_level="partial"
-                warning_msg="Fedora $DISTRO_VERSION 可能不是官方支持版本"
+                warning_msg="Fedora $DISTRO_VERSION $(gettext "detect.distro_support.warning.fedora_unofficial")"
             else
                 support_level="unsupported"
-                warning_msg="Fedora $DISTRO_VERSION 可能不兼容"
+                warning_msg="Fedora $DISTRO_VERSION $(gettext "detect.distro_support.error.fedora_incompatible")"
             fi
             ;;
         ubuntu)
             case $DISTRO_VERSION in
                 20.04|22.04|24.04) support_level="full" ;;
-                18.04) support_level="partial"; warning_msg="Ubuntu 18.04 已EOL" ;;
+                18.04) support_level="partial"; warning_msg=$(gettext "detect.distro_support.warning.ubuntu1804_eol") ;;
                 *) 
                     # 尝试从codename判断
                     if [[ -n "$DISTRO_CODENAME" ]]; then
                         case $DISTRO_CODENAME in
                             focal|jammy|noble) support_level="full" ;;
-                            *) support_level="partial"; warning_msg="可能支持的Ubuntu版本: $DISTRO_VERSION ($DISTRO_CODENAME)" ;;
+                            *) support_level="partial"; warning_msg="$(gettext "detect.distro_support.warning.ubuntu_maybe_supported") $DISTRO_VERSION ($DISTRO_CODENAME)" ;;
                         esac
                     else
                         support_level="partial"
-                        warning_msg="未明确支持的Ubuntu版本: $DISTRO_VERSION"
+                        warning_msg="$(gettext "detect.distro_support.warning.ubuntu_unspecified") $DISTRO_VERSION"
                     fi
                     ;;
             esac
@@ -1062,8 +1436,8 @@ check_distro_support() {
         debian)
             case $DISTRO_VERSION in
                 12) support_level="full" ;;
-                11) support_level="partial"; warning_msg="Debian 11可能需要手动调整" ;;
-                *) support_level="partial"; warning_msg="未明确支持的Debian版本: $DISTRO_VERSION" ;;
+                11) support_level="partial"; warning_msg=$(gettext "detect.distro_support.warning.debian11_needs_tuning") ;;
+                *) support_level="partial"; warning_msg="$(gettext "detect.distro_support.warning.debian_unspecified") $DISTRO_VERSION" ;;
             esac
             ;;
         opensuse*|sles)
@@ -1071,49 +1445,49 @@ check_distro_support() {
                 support_level="full"
             else
                 support_level="partial"
-                warning_msg="可能支持的SUSE版本: $DISTRO_VERSION"
+                warning_msg="$(gettext "detect.distro_support.warning.suse_maybe_supported") $DISTRO_VERSION"
             fi
             ;;
         amzn)
             case $DISTRO_VERSION in
                 2023) support_level="full" ;;
-                2) support_level="partial"; warning_msg="Amazon Linux 2可能需要调整" ;;
-                *) support_level="unsupported"; warning_msg="不支持的Amazon Linux版本: $DISTRO_VERSION" ;;
+                2) support_level="partial"; warning_msg=$(gettext "detect.distro_support.warning.amzn2_needs_tuning") ;;
+                *) support_level="unsupported"; warning_msg="$(gettext "detect.distro_support.error.unsupported_amzn_version") $DISTRO_VERSION" ;;
             esac
             ;;
         azurelinux|mariner)
             case $DISTRO_VERSION in
                 2.0|3.0) support_level="full" ;;
-                *) support_level="partial"; warning_msg="可能支持的Azure Linux版本: $DISTRO_VERSION" ;;
+                *) support_level="partial"; warning_msg="$(gettext "detect.distro_support.warning.azure_maybe_supported") $DISTRO_VERSION" ;;
             esac
             ;;
         kylin)
             case $DISTRO_VERSION in
                 10) support_level="full" ;;
-                *) support_level="partial"; warning_msg="可能支持的KylinOS版本: $DISTRO_VERSION" ;;
+                *) support_level="unsupported"; warning_msg=$(gettext "detect.distro_support.error.unsupported_kylin_version") ;;
             esac
             ;;
         *)
             support_level="unsupported"
-            warning_msg="未知或不支持的发行版: $DISTRO_ID"
+            warning_msg="$(gettext "detect.distro_support.error.unknown_distro") $DISTRO_ID"
             ;;
     esac
     
     # 输出支持状态
     case $support_level in
         "full")
-            log_success "发行版完全支持: $DISTRO_ID $DISTRO_VERSION"
+            log_success "$(gettext "detect.distro_support.success.fully_supported") $DISTRO_ID $DISTRO_VERSION"
             ;;
         "partial")
-            log_warning "发行版部分支持: $warning_msg"
-            if ! confirm "是否继续安装？" "N"; then
-                exit_with_code $EXIT_USER_CANCELLED "用户取消安装"
+            log_warning "$(gettext "detect.distro_support.warning.partially_supported") $warning_msg"
+            if ! confirm $(gettext "detect.distro_support.prompt.confirm.continue_install") "N"; then
+                exit_with_code $EXIT_USER_CANCELLED $(gettext "detect.distro_support.user_cancelled")
             fi
             ;;
         "unsupported")
-            log_error "发行版不支持: $warning_msg"
+            log_error "$(gettext "detect.distro_support.error.unsupported") $warning_msg"
             echo
-            echo "支持的发行版："
+            echo $(gettext "detect.distro_support.info.supported_list_header")
             echo "- RHEL/Rocky/Oracle Linux: 8, 9, 10"
             echo "- Fedora: 39-42"
             echo "- Ubuntu: 20.04, 22.04, 24.04"
@@ -1123,10 +1497,10 @@ check_distro_support() {
             echo "- Azure Linux: 2.0, 3.0"
             echo "- KylinOS: 10"
             echo
-            if ! confirm "是否强制继续安装？" "N"; then
-                exit_with_code $EXIT_UNSUPPORTED_VERSION "不支持的发行版版本: $DISTRO_ID $DISTRO_VERSION"
+            if ! confirm $(gettext "detect.distro_support.prompt.confirm.force_install") "N"; then
+                exit_with_code $EXIT_UNSUPPORTED_VERSION "$(gettext "exit_code.compatibility.unsupported_version") $DISTRO_ID $DISTRO_VERSION"
             fi
-            log_warning "强制安装模式，可能遇到兼容性问题"
+            log_warning $(gettext "detect.distro_support.warning.force_mode_issues")
             ;;
     esac
 }
@@ -1134,11 +1508,11 @@ check_distro_support() {
 # 检查现有NVIDIA驱动安装
 check_existing_nvidia_installation() {
     if [[ "$SKIP_EXISTING_CHECKS" == "true" ]]; then
-        log_info "跳过现有驱动检查"
+        log_info $(gettext "detect.existing_driver.skipping_check")
         return 0
     fi
     
-    log_step "检查现有NVIDIA驱动安装..."
+    log_step $(gettext "detect.existing_driver.starting")
     
     local existing_driver=""
     local installation_method=""
@@ -1146,7 +1520,7 @@ check_existing_nvidia_installation() {
     # 检查是否有NVIDIA内核模块
     if lsmod | grep -q nvidia; then
         existing_driver="kernel_module"
-        log_warning "检测到已加载的NVIDIA内核模块："
+        log_warning $(gettext "detect.existing_driver.warning.kernel_module_loaded")
         lsmod | grep nvidia
     fi
     
@@ -1156,7 +1530,7 @@ check_existing_nvidia_installation() {
             if dpkg -l | grep -q nvidia-driver; then
                 existing_driver="package_manager"
                 installation_method="apt/dpkg"
-                log_warning "检测到通过包管理器安装的NVIDIA驱动："
+                log_warning $(gettext "detect.existing_driver.warning.pkg_manager_install")
                 dpkg -l | grep nvidia-driver
             fi
             ;;
@@ -1164,7 +1538,7 @@ check_existing_nvidia_installation() {
             if rpm -qa | grep -q nvidia-driver; then
                 existing_driver="package_manager"
                 installation_method="dnf/rpm"
-                log_warning "检测到通过包管理器安装的NVIDIA驱动："
+                log_warning $(gettext "detect.existing_driver.warning.pkg_manager_install")
                 rpm -qa | grep nvidia
             fi
             ;;
@@ -1172,7 +1546,7 @@ check_existing_nvidia_installation() {
             if zypper search -i | grep -q nvidia; then
                 existing_driver="package_manager"
                 installation_method="zypper"
-                log_warning "检测到通过包管理器安装的NVIDIA驱动："
+                log_warning $(gettext "detect.existing_driver.warning.pkg_manager_install")
                 zypper search -i | grep nvidia
             fi
             ;;
@@ -1182,20 +1556,20 @@ check_existing_nvidia_installation() {
     if [[ -f /usr/bin/nvidia-uninstall ]]; then
         existing_driver="runfile"
         installation_method="runfile"
-        log_warning "检测到通过runfile安装的NVIDIA驱动"
+        log_warning $(gettext "detect.existing_driver.warning.runfile_install")
     fi
     
     # 检查其他PPA或第三方源
     case $DISTRO_ID in
         ubuntu)
             if apt-cache policy | grep -q "graphics-drivers"; then
-                log_warning "检测到graphics-drivers PPA"
+                log_warning $(gettext "detect.existing_driver.warning.ppa_found")
                 installation_method="${installation_method:+$installation_method, }graphics-drivers PPA"
             fi
             ;;
         fedora)
             if dnf repolist | grep -q rpmfusion; then
-                log_warning "检测到RPM Fusion仓库"
+                log_warning $(gettext "detect.existing_driver.warning.rpm_fusion_found")
                 installation_method="${installation_method:+$installation_method, }RPM Fusion"
             fi
             ;;
@@ -1204,49 +1578,45 @@ check_existing_nvidia_installation() {
     # 处理现有安装 (支持自动化)
     if [[ -n "$existing_driver" ]]; then
         echo
-        log_error "检测到现有NVIDIA驱动安装！"
-        echo "安装方法: $installation_method"
+        log_error $(gettext "detect.existing_driver.error.driver_found")
+        echo "$(gettext "detect.existing_driver.info.install_method") $installation_method"
         echo
 
         if ! [[ "$FORCE_REINSTALL" == "true" ]] && ! [[ "$AUTO_YES" == "true" ]]; then
-            echo "建议操作："
-            echo "1. 卸载现有驱动后重新安装 (推荐)"
-            echo "2. 强制重新安装 (可能导致冲突)"
-            echo "3. 跳过检查继续安装 (高级用户)"
-            echo "4. 退出安装"
+            echo -e "$(gettext "detect.existing_driver.prompt.user_choice")"
             echo
             
-            local choice=$(select_option "请选择操作" "1" \
-                "卸载现有驱动后重新安装" \
-                "强制重新安装" \
-                "跳过检查继续安装" \
-                "退出安装")
-            
+            local choice=$(select_option $(gettext "prompt.select_option.please_select") "1" \
+                $(gettext "prompt.select_option.existing_driver.choice_uninstall") \
+                $(gettext "prompt.select_option.existing_driver.choice_force") \
+                $(gettext "prompt.select_option.existing_driver.choice_skip") \
+                $(gettext "prompt.select_option.existing_driver.choice_exit"))
+
             case $choice in
                 1)
                     uninstall_existing_nvidia_driver "$existing_driver"
                     ;;
                 2)
-                    log_warning "强制重新安装模式"
+                    log_warning $(gettext "detect.existing_driver.warning.force_reinstall_mode")
                     FORCE_REINSTALL=true
                     ;;
                 3)
-                    log_warning "跳过现有驱动检查"
+                    log_warning $(gettext "detect.existing_driver.warning.skip_mode")
                     SKIP_EXISTING_CHECKS=true
                     ;;
                 4)
-                    exit_with_code $EXIT_EXISTING_DRIVER_USER_EXIT "用户选择退出以处理现有驱动"
+                    exit_with_code $EXIT_EXISTING_DRIVER_USER_EXIT $(gettext "detect.existing_driver.exit.user_choice")
                     ;;
             esac
         elif [[ "$AUTO_YES" == "true" ]] && ! [[ "$FORCE_REINSTALL" == "true" ]]; then
             # 自动化模式下的默认行为：卸载现有驱动
-            log_warning "自动化模式：卸载现有驱动后重新安装"
+            log_warning $(gettext "detect.existing_driver.warning.auto_mode_uninstall")
             uninstall_existing_nvidia_driver "$existing_driver"
         else
-            log_warning "强制重新安装模式，跳过现有驱动处理"
+            log_warning $(gettext "detect.existing_driver.warning.force_mode_skip_uninstall")
         fi
     else
-        log_success "未检测到现有NVIDIA驱动"
+        log_success $(gettext "detect.existing_driver.success.no_driver_found")
     fi
 }
 
@@ -1254,13 +1624,13 @@ check_existing_nvidia_installation() {
 uninstall_existing_nvidia_driver() {
     local driver_type="$1"
     
-    log_step "卸载现有NVIDIA驱动..."
+    log_step $(gettext "uninstall.existing_driver.starting")
     
     case $driver_type in
         "runfile")
             if [[ -f /usr/bin/nvidia-uninstall ]]; then
-                log_info "使用nvidia-uninstall卸载runfile安装的驱动"
-                /usr/bin/nvidia-uninstall --silent || log_warning "runfile卸载可能不完整"
+                log_info $(gettext "uninstall.existing_driver.info.using_runfile_uninstaller")
+                /usr/bin/nvidia-uninstall --silent || log_warning $(gettext "uninstall.existing_driver.warning.runfile_uninstall_incomplete")
             fi
             ;;
         "package_manager")
@@ -1286,19 +1656,19 @@ uninstall_existing_nvidia_driver() {
     
     # 清理模块
     if lsmod | grep -q nvidia; then
-        log_info "卸载NVIDIA内核模块"
-        rmmod nvidia_drm nvidia_modeset nvidia_uvm nvidia || log_warning "部分模块卸载失败，需要重启"
+        log_info $(gettext "uninstall.existing_driver.info.removing_kernel_modules")
+        rmmod nvidia_drm nvidia_modeset nvidia_uvm nvidia || log_warning $(gettext "uninstall.existing_driver.warning.module_removal_failed")
     fi
     
     # 清理配置文件
     rm -rf /etc/modprobe.d/*nvidia* /etc/X11/xorg.conf.d/*nvidia* || true
     
-    log_success "现有驱动卸载完成"
+    log_success $(gettext "uninstall.existing_driver.success")
 }
 
 # 检测Secure Boot状态
 check_secure_boot() {
-    log_step "检测UEFI Secure Boot状态..."
+    log_step $(gettext "secure_boot.check.starting")
     
     local secure_boot_enabled=false
     local secure_boot_method=""
@@ -1335,13 +1705,13 @@ check_secure_boot() {
         secure_boot_enabled=true
         secure_boot_method="dmesg"
     fi
-    
-    log_debug "Secure Boot检测方法: $secure_boot_method"
-    
+
+    log_debug "Secure Boot $(gettext "secure_boot.check.method"): $secure_boot_method"
+
     if [[ "$secure_boot_enabled" == "true" ]]; then
         handle_secure_boot_enabled
     else
-        log_success "Secure Boot未启用或系统不支持UEFI"
+        log_success $(gettext "secure_boot.check.disabled_or_unsupported")
     fi
 }
 
@@ -1349,104 +1719,78 @@ check_secure_boot() {
 handle_secure_boot_enabled() {
     echo
     echo -e "${RED}██████████████████████████████████████████████████████████████████████████████${NC}"
-    echo -e "${RED}██                          ⚠️  致命警告  ⚠️                            ██${NC}"
+    echo -e "${RED}██                          ⚠️  $(gettext "secure_boot.check.warning")  ⚠️                            ██${NC}"
     echo -e "${RED}██████████████████████████████████████████████████████████████████████████████${NC}"
     echo
-    log_error "检测到UEFI Secure Boot已启用！"
+    log_error $(gettext "secure_boot.enabled.error_detected")
     echo
-    echo -e "${YELLOW}🚨 为什么这是个问题？${NC}"
-    echo "1. Secure Boot阻止加载未签名的内核模块"
-    echo "2. NVIDIA驱动包含内核模块，必须正确签名才能加载"
-    echo "3. 即使安装成功，驱动也无法工作，导致："
-    echo "   • 黑屏或图形显示异常"
-    echo "   • CUDA/OpenCL不可用"
-    echo "   • 多显示器不工作"
-    echo "   • 系统可能无法启动"
+    echo -e "${YELLOW}🚨 $(gettext "secure_boot.enabled.why_is_problem") ${NC}"
+    echo -e "$(gettext "secure_boot.enabled.why_is_problem_detail")"
     echo
-    echo -e "${GREEN}✅ 推荐解决方案（选择其一）：${NC}"
+    echo -e "${GREEN}✅ $(gettext "secure_boot.enabled.solutions")${NC}"
     echo
-    echo -e "${BLUE}方案1: 禁用Secure Boot (最简单)${NC}"
-    echo "1. 重启进入BIOS/UEFI设置"
-    echo "2. 找到Security或Boot选项"
-    echo "3. 禁用Secure Boot"
-    echo "4. 保存并重启"
-    echo "5. 重新运行此脚本"
+    echo -e "${BLUE}$(gettext "secure_boot.enabled.solution.disable")${NC}"
+    echo -e "$(gettext "secure_boot.enabled.solution.disable_steps")"
     echo
-    echo -e "${BLUE}方案2: 使用MOK密钥签名 (保持Secure Boot)${NC}"
-    echo "1. 安装必要工具: mokutil, openssl, dkms"
-    echo "2. 生成Machine Owner Key (MOK)"
-    echo "3. 将MOK注册到UEFI固件"
-    echo "4. 配置DKMS自动签名NVIDIA模块"
-    echo "5. 重新运行此脚本"
+    echo -e "${BLUE}$(gettext "secure_boot.enabled.solution.sign")${NC}"
+    echo -e "$(gettext "secure_boot.enabled.solution.sign_steps")"
     echo
-    echo -e "${BLUE}方案3: 使用预签名驱动 (如果可用)${NC}"
-    echo "某些发行版提供预签名的NVIDIA驱动："
-    echo "• Ubuntu: 可能通过ubuntu-drivers获得签名驱动"
-    echo "• RHEL: 可能有预编译的签名模块"
-    echo "• SUSE: 可能通过官方仓库获得"
+    echo -e "${BLUE}$(gettext "secure_boot.enabled.solution.prebuilt")${NC}"
+    echo -e "$(gettext "secure_boot.enabled.solution.prebuilt_steps")"
     echo
-    echo -e "${YELLOW}🔧 自动配置MOK密钥 (高级选项)${NC}"
-    echo "此脚本可以帮助配置MOK密钥，但需要："
-    echo "• 在重启时手动确认MOK密钥"
-    echo "• 记住设置的密码"
-    echo "• 理解Secure Boot的安全影响"
+    echo -e "${YELLOW}$(gettext "secure_boot.enabled.solution.mok_setup")${NC}"
+    echo -e $(gettext "secure_boot.enabled.solution.mok_setup_notice")
     echo
     
     # 检查是否已有MOK密钥
     local has_existing_mok=false
     if [[ -f /var/lib/shim-signed/mok/MOK.der ]] || [[ -f /var/lib/dkms/mok.pub ]]; then
         has_existing_mok=true
-        echo -e "${GREEN}✓ 检测到现有MOK密钥文件${NC}"
+        echo -e "${GREEN}$(gettext "secure_boot.enabled.sign.detected")${NC}"
     fi
     
     echo -e "${RED}██████████████████████████████████████████████████████████████████████████████${NC}"
-    echo -e "${RED}██  强烈建议: 在解决Secure Boot问题之前，不要继续安装NVIDIA驱动！   ██${NC}"
+    echo -e "${RED}██  $(gettext "secure_boot.enabled.advice_footer")   ██${NC}"
     echo -e "${RED}██████████████████████████████████████████████████████████████████████████████${NC}"
     echo
 
     if ! [[ "$AUTO_YES" == "true" ]]; then
-        echo "请选择操作："
-        echo "1. 退出安装，我将手动解决Secure Boot问题"
-        echo "2. 帮助配置MOK密钥 (高级用户)"
-        echo "3. 强制继续安装 (不推荐，可能导致系统问题)"
+        echo -e $(gettext "secure_boot.enabled.choose_action.prompt")
         echo
         
-        local choice=$(select_option "请选择" "1" \
-            "退出安装" \
-            "配置MOK密钥" \
-            "强制继续安装")
+        local choice=$(select_option $(gettext "prompt.select_option.please_select") "1" \
+            $(gettext "secure_boot.enabled.choice.exit") \
+            $(gettext "secure_boot.enabled.choice.sign") \
+            $(gettext "secure_boot.enabled.choice.force"))
         
         case $choice in
             1)
-                log_info "安装已取消，请解决Secure Boot问题后重新运行"
+                log_info $(gettext "secure_boot.enabled.exit.cancelled_user_fix")
                 echo
-                echo "有用的命令："
-                echo "• 检查Secure Boot状态: mokutil --sb-state"
-                echo "• 检查现有MOK: mokutil --list-enrolled"
-                echo "• 检查NVIDIA模块: lsmod | grep nvidia"
+                echo -e "$(gettext "secure_boot.enabled.exit.useful_commands")"
                 echo
-                exit_with_code $EXIT_SECURE_BOOT_USER_EXIT "用户选择退出以处理Secure Boot问题"
+                exit_with_code $EXIT_SECURE_BOOT_USER_EXIT $(gettext "secure_boot.enabled.exit.user_choice")
                 ;;
             2)
                 setup_mok_signing
                 ;;
             3)
-                log_warning "用户选择强制继续安装，可能导致驱动无法工作"
+                log_warning $(gettext "secure_boot.enabled.warning.user_forced_install")
                 ;;
         esac
     else
         # 自动化模式下的行为
         if [[ "$has_existing_mok" == "true" ]]; then
-            log_warning "自动化模式：检测到现有MOK密钥，继续安装"
+            log_warning $(gettext "secure_boot.enabled.warning.auto_mode_existing_mok")
         else
-            exit_with_code $EXIT_SECURE_BOOT_AUTO_FAILED "自动化模式下无法处理Secure Boot问题"
+            exit_with_code $EXIT_SECURE_BOOT_AUTO_FAILED $(gettext "secure_boot.enabled.error.auto_mode_failure")
         fi
     fi
 }
 
 # 设置MOK密钥签名
 setup_mok_signing() {
-    log_step "配置MOK密钥签名..."
+    log_step $(gettext "mok.setup.starting")
     
     # 检查必要工具
     local missing_tools=()
@@ -1457,8 +1801,8 @@ setup_mok_signing() {
     done
     
     if [[ ${#missing_tools[@]} -gt 0 ]]; then
-        log_error "缺少必要工具: ${missing_tools[*]}"
-        echo "请先安装这些工具："
+        log_error "$(gettext "mok.setup.error.tools_missing") ${missing_tools[*]}"
+        echo $(gettext "mok.setup.error.please_install_tools")
         case $DISTRO_ID in
             ubuntu|debian)
                 echo "sudo apt install mokutil openssl"
@@ -1470,7 +1814,7 @@ setup_mok_signing() {
                 echo "sudo zypper install mokutil openssl"
                 ;;
         esac
-        exit_with_code $EXIT_MOK_TOOLS_MISSING "缺少MOK管理工具: ${missing_tools[*]}"
+        exit_with_code $EXIT_MOK_TOOLS_MISSING "$(gettext "mok.setup.error.tools_missing") ${missing_tools[*]}"
     fi
     
     # 检查是否已有MOK密钥
@@ -1481,15 +1825,15 @@ setup_mok_signing() {
     if [[ -f /var/lib/shim-signed/mok/MOK.priv ]] && [[ -f /var/lib/shim-signed/mok/MOK.der ]]; then
         mok_key_path="/var/lib/shim-signed/mok/MOK.priv"
         mok_cert_path="/var/lib/shim-signed/mok/MOK.der"
-        log_info "使用现有Ubuntu/Debian MOK密钥"
+        log_info $(gettext "mok.setup.info.using_ubuntu_key")
     # DKMS路径
     elif [[ -f /var/lib/dkms/mok.key ]] && [[ -f /var/lib/dkms/mok.der ]]; then
         mok_key_path="/var/lib/dkms/mok.key"
         mok_cert_path="/var/lib/dkms/mok.der"
-        log_info "使用现有DKMS MOK密钥"
+        log_info $(gettext "mok.setup.info.using_dkms_key")
     else
         # 生成新的MOK密钥
-        log_info "生成新的MOK密钥..."
+        log_info $(gettext "mok.setup.info.generating_new_key")
         
         # 创建目录
         mkdir -p /var/lib/dkms
@@ -1502,7 +1846,7 @@ setup_mok_signing() {
             -out /var/lib/dkms/mok.der \
             -nodes -days 36500 \
             -subj "/CN=NVIDIA Driver MOK Signing Key"; then
-            exit_with_code $EXIT_MOK_OPERATION_FAILED "MOK密钥生成失败"
+            exit_with_code $EXIT_MOK_OPERATION_FAILED $(gettext "mok.setup.error.generation_failed")
         fi
         
         # 也生成PEM格式的公钥供参考
@@ -1511,34 +1855,26 @@ setup_mok_signing() {
         mok_key_path="/var/lib/dkms/mok.key"
         mok_cert_path="/var/lib/dkms/mok.der"
         
-        log_success "MOK密钥生成完成"
+        log_success $(gettext "mok.setup.success.generation_complete")
     fi
     
     # 注册MOK密钥
-    log_info "注册MOK密钥到UEFI固件..."
+    log_info $(gettext "mok.setup.info.enrolling_key")
     echo
-    echo -e "${YELLOW}重要说明：${NC}"
-    echo "1. 系统将提示您输入一个一次性密码"
-    echo "2. 请记住这个密码，重启时需要使用"
-    echo "3. 建议使用简单的数字密码（考虑键盘布局）"
+    echo -e "${YELLOW}$(gettext "mok.setup.enroll.important_note_header")${NC}"
+    echo -e "$(gettext "mok.setup.enroll.note")"
     echo
     
     if ! mokutil --import "$mok_cert_path"; then
-        exit_with_code $EXIT_MOK_OPERATION_FAILED "MOK密钥注册失败"
+        exit_with_code $EXIT_MOK_OPERATION_FAILED $(gettext "mok.setup.error.enroll_failed")
     fi
     
-    log_success "MOK密钥已排队等待注册"
+    log_success $(gettext "mok.setup.success.enroll_queued")
     echo
-    echo -e "${GREEN}下一步操作：${NC}"
-    echo "1. 脚本安装完成后，系统将重启"
-    echo "2. 重启时会出现MOK Manager界面"
-    echo "3. 选择 'Enroll MOK'"
-    echo "4. 选择 'Continue'"
-    echo "5. 选择 'Yes'"
-    echo "6. 输入刚才设置的密码"
-    echo "7. 系统将再次重启"
+    echo -e "${GREEN}$(gettext "mok.setup.next_steps.header")${NC}"
+    echo -e "$(gettext "mok.setup.enroll.next_steps")"
     echo
-    echo -e "${YELLOW}注意：MOK Manager界面可能使用英文，请仔细操作${NC}"
+    echo -e "${YELLOW}$(gettext "mok.setup.next_steps.warning_english_interface")${NC}"
     
     # 配置DKMS自动签名
     configure_dkms_signing "$mok_key_path" "$mok_cert_path"
@@ -1549,7 +1885,7 @@ configure_dkms_signing() {
     local key_path="$1"
     local cert_path="$2"
     
-    log_info "配置DKMS自动签名..."
+    log_info $(gettext "配置DKMS自动签名...")
     
     # 配置DKMS签名工具
     if [[ -f /etc/dkms/framework.conf ]]; then
@@ -1574,12 +1910,12 @@ EOF
     
     save_rollback_info "rm -f /etc/dkms/sign_helper.sh /etc/dkms/nvidia.conf"
     
-    log_success "DKMS自动签名配置完成"
+    log_success $(gettext "dkms.signing.configuring")
 }
 
 # 预安装检查集合
 pre_installation_checks() {
-    log_step "执行预安装检查..."
+    log_step $(gettext "pre_check.starting")
     
     # 检查Secure Boot状态
     check_secure_boot
@@ -1587,27 +1923,24 @@ pre_installation_checks() {
     # 检查根分区空间
     local root_space=$(df / | awk 'NR==2 {print $4}')
     if [[ $root_space -lt 1048576 ]]; then  # 1GB
-        log_warning "根分区可用空间不足1GB，可能影响安装"
+        log_warning $(gettext "root.partition.space.insufficient")
     fi
     
     # 检查是否在虚拟机中运行
     if systemd-detect-virt --quiet; then
         local virt_type=$(systemd-detect-virt)
-        log_warning "检测到虚拟机环境: $virt_type"
-        echo "注意事项："
-        echo "• 确保虚拟机已启用3D加速"
-        echo "• 某些虚拟机可能不支持NVIDIA GPU直通"
-        echo "• 容器环境可能需要特殊配置"
+        log_warning "$(gettext "pre_check.warning.vm_detected") $virt_type"
+        echo -e "$(gettext "pre_check.vm.note")"
     fi
     
     # 检查是否有自定义内核
     local kernel_version=$(uname -r)
     if [[ "$kernel_version" =~ (custom|zen|liquorix) ]]; then
-        log_warning "检测到自定义内核: $kernel_version"
-        echo "自定义内核可能需要额外的DKMS配置"
+        log_warning "$(gettext "pre_check.warning.custom_kernel_detected") $kernel_version"
+        echo $(gettext "pre_check.custom_kernel.note")
     fi
     
-    log_success "预安装检查完成"
+    log_success $(gettext "pre_check.success")
 }
 
 # 获取发行版特定的变量
@@ -1671,18 +2004,18 @@ safe_add_repository() {
     case $repo_type in
         "dnf")
             if dnf repolist | grep -q "$repo_name"; then
-                log_info "仓库 $repo_name 已存在，跳过添加"
+                log_info "$repo_name $(gettext "repo.add.exists")"
             else
-                log_info "添加DNF仓库: $repo_name"
+                log_info "$(gettext "repo.add.adding") $repo_name"
                 dnf config-manager --add-repo "$repo_url"
                 save_rollback_info "dnf config-manager --remove-repo $repo_name"
             fi
             ;;
         "apt")
             if [[ -f "/etc/apt/sources.list.d/$repo_name.list" ]] || grep -q "$repo_url" /etc/apt/sources.list.d/*.list 2>/dev/null; then
-                log_info "APT仓库已存在，跳过添加"
+                log_info $(gettext "repo.add.exists")
             else
-                log_info "添加APT仓库: $repo_name"
+                log_info "$(gettext "repo.add.adding") $repo_name"
                 if [[ -n "$key_url" ]]; then
                     wget -qO- "$key_url" | gpg --dearmor > "/usr/share/keyrings/$repo_name-keyring.gpg"
                     echo "deb [signed-by=/usr/share/keyrings/$repo_name-keyring.gpg] $repo_url" > "/etc/apt/sources.list.d/$repo_name.list"
@@ -1695,9 +2028,9 @@ safe_add_repository() {
             ;;
         "zypper")
             if zypper lr | grep -q "$repo_name"; then
-                log_info "Zypper仓库 $repo_name 已存在，跳过添加"
+                log_info "$repo_name $(gettext "repo.add.exists")"
             else
-                log_info "添加Zypper仓库: $repo_name"
+                log_info "$(gettext "repo.add.adding") $repo_name"
                 zypper addrepo "$repo_url" "$repo_name"
                 save_rollback_info "zypper removerepo $repo_name"
             fi
@@ -1746,7 +2079,7 @@ safe_install_package() {
     
     # 只安装缺失的包
     if [[ ${#missing_packages[@]} -gt 0 ]]; then
-        log_info "安装缺失的包: ${missing_packages[*]}"
+        log_info "$(gettext "pkg_install.info.installing_missing") ${missing_packages[*]}"
         case $package_manager in
             "dnf")
                 dnf install -y "${missing_packages[@]}"
@@ -1770,26 +2103,26 @@ safe_install_package() {
             save_rollback_info "$package_manager remove -y $pkg"
         done
     else
-        log_info "所有包已安装，跳过安装步骤"
+        log_info $(gettext "pkg_install.info.all_packages_exist")
     fi
 }
 
 # 启用第三方仓库和依赖
 enable_repositories() {
     if is_step_completed "enable_repositories"; then
-        log_info "第三方仓库已启用，跳过此步骤"
+        log_info $(gettext "repo.enable.already_done")
         return 0
     fi
     
-    log_step "启用必要的仓库和依赖..."
+    log_step $(gettext "repo.enable.starting")
     
     case $DISTRO_ID in
         rhel)
             # RHEL需要subscription-manager启用仓库
             if [[ "$DISTRO_VERSION" == "10" ]]; then
-                subscription-manager repos --enable=rhel-10-for-${ARCH}-appstream-rpms || log_warning "无法启用appstream仓库"
-                subscription-manager repos --enable=rhel-10-for-${ARCH}-baseos-rpms || log_warning "无法启用baseos仓库"
-                subscription-manager repos --enable=codeready-builder-for-rhel-10-${ARCH}-rpms || log_warning "无法启用codeready-builder仓库"
+                subscription-manager repos --enable=rhel-10-for-${ARCH}-appstream-rpms || log_warning $(gettext "repo.enable.error.rhel_appstream")
+                subscription-manager repos --enable=rhel-10-for-${ARCH}-baseos-rpms || log_warning $(gettext "repo.enable.error.rhel_baseos")
+                subscription-manager repos --enable=codeready-builder-for-rhel-10-${ARCH}-rpms || log_warning $(gettext "repo.enable.error.rhel_crb")
                 
                 # 安装EPEL
                 if ! rpm -q epel-release &>/dev/null; then
@@ -1797,19 +2130,17 @@ enable_repositories() {
                     save_rollback_info "dnf remove -y epel-release"
                 fi
             elif [[ "$DISTRO_VERSION" == "9" ]]; then
-                subscription-manager repos --enable=rhel-9-for-${ARCH}-appstream-rpms || log_warning "无法启用appstream仓库"
-                subscription-manager repos --enable=rhel-9-for-${ARCH}-baseos-rpms || log_warning "无法启用baseos仓库"
-                subscription-manager repos --enable=codeready-builder-for-rhel-9-${ARCH}-rpms || log_warning "无法启用codeready-builder仓库"
-                
+                subscription-manager repos --enable=rhel-9-for-${ARCH}-appstream-rpms || log_warning $(gettext "repo.enable.error.rhel_appstream")
+                subscription-manager repos --enable=rhel-9-for-${ARCH}-baseos-rpms || log_warning $(gettext "repo.enable.error.rhel_baseos")
+                subscription-manager repos --enable=codeready-builder-for-rhel-9-${ARCH}-rpms || log_warning $(gettext "repo.enable.error.rhel_crb")
                 if ! rpm -q epel-release &>/dev/null; then
                     dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm
                     save_rollback_info "dnf remove -y epel-release"
                 fi
             elif [[ "$DISTRO_VERSION" == "8" ]]; then
-                subscription-manager repos --enable=rhel-8-for-${ARCH}-appstream-rpms || log_warning "无法启用appstream仓库"
-                subscription-manager repos --enable=rhel-8-for-${ARCH}-baseos-rpms || log_warning "无法启用baseos仓库"
-                subscription-manager repos --enable=codeready-builder-for-rhel-8-${ARCH}-rpms || log_warning "无法启用codeready-builder仓库"
-                
+                subscription-manager repos --enable=rhel-8-for-${ARCH}-appstream-rpms || log_warning $(gettext "repo.enable.error.rhel_appstream")
+                subscription-manager repos --enable=rhel-8-for-${ARCH}-baseos-rpms || log_warning $(gettext "repo.enable.error.rhel_baseos")
+                subscription-manager repos --enable=codeready-builder-for-rhel-8-${ARCH}-rpms || log_warning $(gettext "repo.enable.error.rhel_crb")
                 if ! rpm -q epel-release &>/dev/null; then
                     dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm
                     save_rollback_info "dnf remove -y epel-release"
@@ -1870,7 +2201,7 @@ enable_repositories() {
         opensuse*|sles)
             # 启用PackageHub
             if command -v SUSEConnect >/dev/null 2>&1 && ! SUSEConnect -l | grep -q PackageHub; then
-                SUSEConnect --product PackageHub/15/$(uname -m) || log_warning "无法启用PackageHub"
+                SUSEConnect --product PackageHub/15/$(uname -m) || log_warning $(gettext "repo.enable.error.suse_packagehub")
                 save_rollback_info "SUSEConnect -d --product PackageHub/15/$(uname -m)"
             fi
             
@@ -1893,11 +2224,11 @@ enable_repositories() {
 # 安装内核头文件和开发包
 install_kernel_headers() {
     if is_step_completed "install_kernel_headers"; then
-        log_info "内核头文件已安装，跳过此步骤"
+        log_info $(gettext "kernel_headers.install.already_done")
         return 0
     fi
     
-    log_step "安装内核头文件和开发包..."
+    log_step $(gettext "kernel_headers.install.starting")
     
     local kernel_version=$(uname -r)
     
@@ -1940,7 +2271,7 @@ install_kernel_headers() {
 
 # 安装本地仓库
 install_local_repository() {
-    log_info "设置本地仓库安装..."
+    log_info $(gettext "repo.local.setup.starting")
     
     local version=${DRIVER_VERSION:-"latest"}
     local base_url="https://developer.download.nvidia.com/compute/nvidia-driver"
@@ -1948,13 +2279,13 @@ install_local_repository() {
     case $DISTRO_ID in
         rhel|rocky|ol|almalinux|fedora|amzn|azurelinux|mariner|kylin)
             local rpm_file="nvidia-driver-local-repo-${DISTRO_REPO}.${version}.${ARCH_EXT}.rpm"
-            log_info "下载本地仓库包: $rpm_file"
+            log_info "$(gettext "repo.local.setup.downloading") $rpm_file"
             wget -O /tmp/$rpm_file "${base_url}/${version}/local_installers/${rpm_file}"
             rpm --install /tmp/$rpm_file
             ;;
         ubuntu|debian)
             local deb_file="nvidia-driver-local-repo-${DISTRO_REPO}-${version}_${ARCH_EXT}.deb"
-            log_info "下载本地仓库包: $deb_file"
+            log_info "$(gettext "repo.local.setup.downloading") $deb_file"
             wget -O /tmp/$deb_file "${base_url}/${version}/local_installers/${deb_file}"
             dpkg -i /tmp/$deb_file
             apt update
@@ -1963,7 +2294,7 @@ install_local_repository() {
             ;;
         opensuse*|sles)
             local rpm_file="nvidia-driver-local-repo-${DISTRO_REPO}.${version}.${ARCH_EXT}.rpm"
-            log_info "下载本地仓库包: $rpm_file"
+            log_info "$(gettext "repo.local.setup.downloading") $rpm_file"
             wget -O /tmp/$rpm_file "${base_url}/${version}/local_installers/${rpm_file}"
             rpm --install /tmp/$rpm_file
             ;;
@@ -1972,8 +2303,8 @@ install_local_repository() {
 
 # 安装网络仓库 
 install_network_repository() {
-    log_info "设置网络仓库..."
-    
+    log_info $(gettext "repo.network.setup.starting")
+
     case $DISTRO_ID in
         rhel|rocky|ol|almalinux|fedora|amzn|kylin)
             local repo_url="https://developer.download.nvidia.com/compute/cuda/repos/${DISTRO_REPO}/${ARCH}/cuda-${DISTRO_REPO}.repo"
@@ -1989,13 +2320,13 @@ install_network_repository() {
             # 检查并安装cuda-keyring
             if ! dpkg -l cuda-keyring &>/dev/null; then
                 local keyring_url="https://developer.download.nvidia.com/compute/cuda/repos/${DISTRO_REPO}/${ARCH}/cuda-keyring_1.1-1_all.deb"
-                log_info "下载并安装cuda-keyring"
+                log_info $(gettext "repo.network.setup.installing_keyring")
                 wget -O /tmp/cuda-keyring.deb "$keyring_url"
                 dpkg -i /tmp/cuda-keyring.deb
                 save_rollback_info "dpkg -r cuda-keyring"
                 rm -f /tmp/cuda-keyring.deb
             else
-                log_info "cuda-keyring已安装，跳过"
+                log_info $(gettext "repo.network.setup.keyring_exists")
             fi
             
             if ! is_step_completed "apt_update_after_repo"; then
@@ -2027,11 +2358,11 @@ install_network_repository() {
 # 添加NVIDIA官方仓库
 add_nvidia_repository() {
     if is_step_completed "add_nvidia_repository"; then
-        log_info "NVIDIA仓库已添加，跳过此步骤"
+        log_info $(gettext "repo.nvidia.add.already_done")
         return 0
     fi
     
-    log_step "添加NVIDIA官方仓库..."
+    log_step $(gettext "repo.nvidia.add.starting")
     
     get_distro_vars
 
@@ -2049,7 +2380,7 @@ enable_dnf_modules() {
     case $DISTRO_ID in
         rhel|rocky|ol|almalinux)
             if [[ "$DISTRO_VERSION" =~ ^(8|9) ]]; then
-                log_step "启用DNF模块..."
+                log_step $(gettext "dnf_module.enable.starting")
                 if [[ "$USE_OPEN_MODULES" == "true" ]]; then
                     dnf module enable -y nvidia-driver:open-dkms
                 else
@@ -2058,7 +2389,7 @@ enable_dnf_modules() {
             fi
             ;;
         kylin|amzn)
-            log_step "启用DNF模块..."
+            log_step $(gettext "dnf_module.enable.starting")
             if [[ "$USE_OPEN_MODULES" == "true" ]]; then
                 dnf module enable -y nvidia-driver:open-dkms
             else
@@ -2070,8 +2401,8 @@ enable_dnf_modules() {
 
 # 安装NVIDIA驱动
 install_nvidia_driver() {
-    log_step "安装NVIDIA驱动 ($(if $USE_OPEN_MODULES; then echo "开源模块"; else echo "专有模块"; fi), $INSTALL_TYPE)..."
-    
+    log_step "$(gettext "nvidia_driver.install.starting") ($(if $USE_OPEN_MODULES; then echo $(gettext "nvidia_driver.type.open"); else echo $(gettext "nvidia_driver.type.proprietary"); fi), $INSTALL_TYPE)..."
+
     case $DISTRO_ID in
         rhel|rocky|ol|almalinux|fedora|kylin|amzn)
             install_nvidia_rpm
@@ -2176,7 +2507,7 @@ install_nvidia_suse() {
 
 # 禁用nouveau驱动
 disable_nouveau() {
-    log_step "禁用nouveau开源驱动..."
+    log_step $(gettext "nouveau.disable.starting")
     
     local need_reboot=false
     local nouveau_active=false
@@ -2184,15 +2515,15 @@ disable_nouveau() {
     # 检查nouveau是否正在使用
     if lsmod | grep -q "^nouveau"; then
         nouveau_active=true
-        log_warning "检测到nouveau驱动正在运行"
+        log_warning $(gettext "nouveau.disable.warning.detected_running")
         
         # 检查是否有进程正在使用nouveau
         local processes_using_drm=$(lsof /dev/dri/* 2>/dev/null | wc -l)
         if [[ $processes_using_drm -gt 0 ]]; then
-            log_warning "检测到有 $processes_using_drm 个进程正在使用图形设备"
+            log_warning "$processes_using_drm ${gettext "nouveau.disable.warning.processes_using_drm"}"
             
             # 尝试停止图形相关服务
-            log_info "尝试停止图形服务以释放nouveau驱动..."
+            log_info $(gettext "nouveau.disable.info.stopping_display_manager")
             
             # 停止显示管理器
             local display_managers=("gdm" "lightdm" "sddm" "xdm" "kdm")
@@ -2200,8 +2531,8 @@ disable_nouveau() {
             
             for dm in "${display_managers[@]}"; do
                 if systemctl is-active --quiet "$dm" 2>/dev/null; then
-                    log_info "停止显示管理器: $dm"
-                    systemctl stop "$dm" || log_warning "无法停止 $dm"
+                    log_info "$(gettext "nouveau.disable.info.stop_display_manager") $dm"
+                    systemctl stop "$dm" || log_warning "$(gettext "nouveau.disable.warning.failed_stopping_display_manager") $dm"
                     stopped_services+=("$dm")
                     sleep 2
                 fi
@@ -2209,7 +2540,7 @@ disable_nouveau() {
             
             # 尝试切换到文本模式
             if [[ -n "${stopped_services[*]}" ]]; then
-                log_info "切换到文本模式..."
+                log_info $(gettext "nouveau.disable.info.switching_to_text_mode")
                 systemctl isolate multi-user.target 2>/dev/null || true
                 sleep 3
             fi
@@ -2222,7 +2553,7 @@ disable_nouveau() {
         fi
         
         # 尝试卸载nouveau模块
-        log_info "尝试卸载nouveau驱动模块..."
+        log_info $(gettext "nouveau.disable.info.unloading_module")
         
         # 卸载相关模块（按依赖顺序）
         local modules_to_remove=("nouveau" "ttm" "drm_kms_helper")
@@ -2230,11 +2561,11 @@ disable_nouveau() {
         
         for module in "${modules_to_remove[@]}"; do
             if lsmod | grep -q "^$module"; then
-                log_debug "尝试卸载模块: $module"
+                log_debug "$(gettext "nouveau.disable.info.unload_module"): $module"
                 if modprobe -r "$module" 2>/dev/null; then
-                    log_success "成功卸载模块: $module"
+                    log_success "$(gettext "nouveau.disable.success.module_unloaded") $module"
                 else
-                    log_warning "无法卸载模块: $module"
+                    log_warning "$(gettext "nouveau.disable.warning.module_unload_failed") $module"
                     failed_modules+=("$module")
                 fi
             fi
@@ -2242,18 +2573,18 @@ disable_nouveau() {
         
         # 检查nouveau是否完全卸载
         if lsmod | grep -q "^nouveau"; then
-            log_error "nouveau模块仍在运行，需要重启系统才能完全禁用"
+            log_error $(gettext "nouveau.disable.error.still_running_reboot_needed")
             need_reboot=true
         else
-            log_success "nouveau模块已成功卸载"
+            log_success $(gettext "nouveau.disable.success.module_unloaded_all")
             nouveau_active=false
         fi
     else
-        log_info "nouveau驱动未运行"
+        log_info $(gettext "nouveau.disable.info.not_running")
     fi
     
     # 创建黑名单文件（无论如何都要创建）
-    log_info "创建nouveau黑名单配置..."
+    log_info $(gettext "nouveau.disable.info.creating_blacklist")
     cat > /etc/modprobe.d/blacklist-nvidia-nouveau.conf << EOF
 # 禁用nouveau开源驱动，由NVIDIA安装脚本生成
 blacklist nouveau
@@ -2263,34 +2594,34 @@ EOF
     save_rollback_info "rm -f /etc/modprobe.d/blacklist-nvidia-nouveau.conf"
     
     # 更新initramfs
-    log_info "更新initramfs以确保nouveau在启动时被禁用..."
+    log_info $(gettext "nouveau.disable.info.updating_initramfs")
     case $DISTRO_ID in
         ubuntu|debian)
             if ! update-initramfs -u; then
-                log_warning "更新initramfs失败，可能影响下次启动"
+                log_warning $(gettext "nouveau.disable.warning.initramfs_update_failed")
             fi
             ;;
         rhel|rocky|ol|almalinux|fedora|kylin|amzn)
             if command -v dracut &> /dev/null; then
                 if ! dracut -f; then
-                    log_warning "更新initramfs失败，可能影响下次启动"
+                    log_warning $(gettext "nouveau.disable.warning.initramfs_update_failed")
                 fi
             else
-                log_warning "dracut命令未找到，无法更新initramfs"
+                log_warning $(gettext "nouveau.disable.warning.dracut_missing")
             fi
             ;;
         opensuse*|sles)
             if ! mkinitrd; then
-                log_warning "更新initramfs失败，可能影响下次启动"
+                log_warning $(gettext "nouveau.disable.warning.initramfs_update_failed")
             fi
             ;;
         azurelinux|mariner)
             if command -v dracut &> /dev/null; then
                 if ! dracut -f; then
-                    log_warning "更新initramfs失败，可能影响下次启动"
+                    log_warning $(gettext "nouveau.disable.warning.initramfs_update_failed")
                 fi
             else
-                log_warning "dracut命令未找到，无法更新initramfs"
+                log_warning $(gettext "nouveau.disable.warning.dracut_missing")
             fi
             ;;
     esac
@@ -2301,15 +2632,15 @@ EOF
         read -r stopped_services < "$STATE_DIR/stopped_display_managers"
         
         if [[ -n "$stopped_services" ]]; then
-            log_info "nouveau已禁用，重启显示服务..."
+            log_info $(gettext "nouveau.disable.info.restarting_display_manager")
             # 切换回图形模式
             systemctl isolate graphical.target 2>/dev/null || true
             sleep 2
             
             # 重启显示管理器
             for dm in $stopped_services; do
-                log_info "重启显示管理器: $dm"
-                systemctl start "$dm" || log_warning "无法重启 $dm"
+                log_info "$(gettext "nouveau.disable.info.restart_display_manager"): $dm"
+                systemctl start "$dm" || log_warning "$(gettext "nouveau.disable.warning.restart_failed"): $dm"
             done
             
             rm -f "$STATE_DIR/stopped_display_managers"
@@ -2318,33 +2649,29 @@ EOF
     
     # 报告状态并决定后续行动
     if [[ "$need_reboot" == "true" ]]; then
-        log_warning "nouveau驱动需要重启系统才能完全禁用"
+        log_warning $(gettext "nouveau.disable.warning.reboot_required_final")
         echo "NOUVEAU_NEEDS_REBOOT=true" > "$STATE_DIR/nouveau_status"
         
         echo
-        log_error "⚠️  重要提醒：需要重启系统"
-        echo "nouveau驱动仍在运行中，必须重启系统后才能继续安装NVIDIA驱动"
-        echo "这通常发生在以下情况："
-        echo "• 有图形程序正在使用nouveau驱动"
-        echo "• nouveau模块被其他模块依赖"
-        echo "• 系统正在图形模式下运行"
+        log_error $(gettext "nouveau.disable.error.reboot_needed_header")
+        echo $(gettext "nouveau.disable.error.reboot_needed_note")
         echo
         
         if [[ "$AUTO_YES" == "true" ]]; then
-            log_info "自动化模式：保存当前状态，重启后将自动继续安装"
+            log_info $(gettext "nouveau.disable.info.auto_mode_reboot")
             save_state "nouveau_disabled_need_reboot"
             reboot
         else
-            if confirm "是否现在重启系统？重启后请重新运行安装脚本" "Y"; then
-                log_info "正在重启系统，重启后请重新运行安装脚本..."
+            if confirm $(gettext "nouveau.disable.confirm.reboot_now") "Y"; then
+                log_info $(gettext "nouveau.disable.info.rebooting_now")
                 save_state "nouveau_disabled_need_reboot"
                 reboot
             else
-                exit_with_code $EXIT_NOUVEAU_DISABLE_FAILED "用户选择不重启，无法继续安装"
+                exit_with_code $EXIT_NOUVEAU_DISABLE_FAILED $(gettext "nouveau.disable.exit.user_refused_reboot")
             fi
         fi
     else
-        log_success "nouveau驱动已成功禁用，继续安装NVIDIA驱动"
+        log_success $(gettext "nouveau.disable.success.continue_install")
         echo "NOUVEAU_NEEDS_REBOOT=false" > "$STATE_DIR/nouveau_status"
         
         # 既然nouveau已经成功禁用，就不需要在最终重启逻辑中额外处理
@@ -2354,19 +2681,19 @@ EOF
 
 # 启用persistence daemon
 enable_persistence_daemon() {
-    log_step "启用NVIDIA persistence daemon..."
+    log_step $(gettext "persistence_daemon.enable.starting")
     
     if systemctl list-unit-files | grep -q nvidia-persistenced; then
         systemctl enable nvidia-persistenced
-        log_success "NVIDIA persistence daemon已启用"
+        log_success $(gettext "persistence_daemon.enable.success")
     else
-        log_warning "nvidia-persistenced服务未找到"
+        log_warning $(gettext "persistence_daemon.enable.warning.service_not_found")
     fi
 }
 
 # 验证安装
 verify_installation() {
-    log_step "验证NVIDIA驱动安装..."
+    log_step $(gettext "verify.starting")
     
     local driver_working=false
     local needs_reboot=false
@@ -2374,40 +2701,40 @@ verify_installation() {
     # 检查驱动版本
     if [[ -f /proc/driver/nvidia/version ]]; then
         local driver_version=$(cat /proc/driver/nvidia/version | head -1)
-        log_success "NVIDIA驱动已加载: $driver_version"
+        log_success "$(gettext "verify.driver_loaded"): $driver_version"
     else
-        log_warning "NVIDIA驱动模块未加载"
+        log_warning $(gettext "verify.warning.module_not_loaded")
         needs_reboot=true
     fi
     
     # 检查nvidia-smi
     if command -v nvidia-smi &> /dev/null; then
-        log_success "nvidia-smi工具可用"
-        log_info "测试NVIDIA驱动功能..."
+        log_success $(gettext "verify.success.smi_available")
+        log_info $(gettext "verify.info.testing_driver")
         
         if nvidia-smi &> /dev/null; then
-            log_success "NVIDIA驱动工作正常！"
+            log_success $(gettext "verify.success.driver_working")
             driver_working=true
             echo
             nvidia-smi
         else
-            log_error "nvidia-smi执行失败，驱动未正常工作"
+            log_error $(gettext "verify.error.smi_failed")
             needs_reboot=true
         fi
     else
-        log_warning "nvidia-smi命令不可用"
+        log_warning $(gettext "verify.warning.smi_unavailable")
         needs_reboot=true
     fi
     
     # 检查模块类型
     if lsmod | grep -q nvidia; then
         local module_info=$(lsmod | grep nvidia | head -1)
-        log_info "已加载的NVIDIA模块: $module_info"
-        
+        log_info "$(gettext "verify.info.loaded_modules"): $module_info"
+
         # 检查是否是开源模块
         if [[ -f /sys/module/nvidia/version ]]; then
-            local module_version=$(cat /sys/module/nvidia/version 2>/dev/null || echo "未知")
-            log_info "模块版本: $module_version"
+            local module_version=$(cat /sys/module/nvidia/version 2>/dev/null || echo $(gettext "common.unknown"))
+            log_info "$(gettext "verify.info.module_version") $module_version"
         fi
     fi
     
@@ -2427,7 +2754,7 @@ verify_installation() {
 
 # 清理安装文件
 cleanup() {
-    log_step "清理安装文件..."
+    log_step $(gettext "cleanup.install_files.starting")
 
     if [[ "$USE_LOCAL_REPO" == "true" ]]; then
         case $DISTRO_ID in
@@ -2455,16 +2782,12 @@ cleanup() {
 
 # 显示后续步骤 (更新信息)
 show_next_steps() {
-    log_success "NVIDIA驱动安装完成！"
+    log_success $(gettext "final.success.header")
     echo
-    echo -e "${GREEN}安装摘要:${NC}"
-    echo "- 发行版: $DISTRO_ID $DISTRO_VERSION"
-    echo "- 架构: $ARCH"
-    echo "- 模块类型: $(if $USE_OPEN_MODULES; then echo "开源内核模块"; else echo "专有内核模块"; fi)"
-    echo "- 安装类型: $INSTALL_TYPE"
-    echo "- 仓库类型: $(if $USE_LOCAL_REPO; then echo "本地仓库"; else echo "网络仓库"; fi)"
+    echo -e "${GREEN}$(gettext "final.summary.header")${NC}"
+    echo -e "- $(gettext "final.summary.distro"): $DISTRO_ID $DISTRO_VERSION\n- $(gettext "final.summary.arch"): $ARCH\n- $(gettext "final.summary.module_type"): $(if $USE_OPEN_MODULES; then echo $(gettext "module.type.open_kernel"); else echo $(gettext "module.type.proprietary_kernel"); fi)\n- $(gettext "final.summary.install_type"): $INSTALL_TYPE\n- $(gettext "final.summary.repo_type"): $(if $USE_LOCAL_REPO; then echo $(gettext "repo.type.local"); else echo $(gettext "repo.type.network"); fi)"
     echo
-    
+
     # 根据驱动工作状态显示不同的后续步骤
     local driver_working=false
     if [[ -f "$STATE_DIR/driver_status" ]]; then
@@ -2473,19 +2796,12 @@ show_next_steps() {
             driver_working=true
         fi
     fi
-    
-    echo -e "${YELLOW}后续步骤:${NC}"
+
+    echo -e "${YELLOW}$(gettext "final.next_steps.header")${NC}"
     if [[ "$driver_working" == "true" ]]; then
-        echo "1. ✅ 驱动已正常工作，可立即使用NVIDIA GPU"
-        echo "2. 如需安装CUDA Toolkit，请访问: https://docs.nvidia.com/cuda/cuda-installation-guide-linux/"
-        echo "3. 技术支持论坛: https://forums.developer.nvidia.com/c/gpu-graphics/linux/148"
-        echo "4. 如遇问题，可运行 '$0 --rollback' 回滚安装"
+        echo -e "$(gettext "final.next_steps.working.note") '$0 --rollback' "
     else
-        echo "1. 重启系统以确保驱动完全生效"
-        echo "2. 重启后运行 'nvidia-smi' 验证安装"
-        echo "3. 如需安装CUDA Toolkit，请访问: https://docs.nvidia.com/cuda/cuda-installation-guide-linux/"
-        echo "4. 技术支持论坛: https://forums.developer.nvidia.com/c/gpu-graphics/linux/148"
-        echo "5. 如遇问题，可运行 '$0 --rollback' 回滚安装"
+        echo -e "$(gettext "final.next_steps.not_working.note") '$0 --rollback' "
     fi
     
     # Secure Boot相关提示
@@ -2493,13 +2809,11 @@ show_next_steps() {
         local sb_value=$(od -An -t u1 /sys/firmware/efi/efivars/SecureBoot-* 2>/dev/null | tr -d ' ')
         if [[ "$sb_value" =~ 1$ ]]; then
             echo
-            echo -e "${YELLOW}🔐 Secure Boot提醒：${NC}"
+            echo -e "${YELLOW}$(gettext "final.next_steps.secure_boot.header")${NC}"
             if [[ "$driver_working" == "true" ]]; then
-                echo "6. ✅ MOK密钥已正确配置，驱动正常工作"
+                echo $(gettext "final.next_steps.secure_boot.working")
             else
-                echo "6. 重启时如果出现MOK Manager界面，请选择 'Enroll MOK' 并输入密码"
-                echo "7. 如果驱动无法加载，检查: sudo dmesg | grep nvidia"
-                echo "8. 验证模块签名: modinfo nvidia | grep sig"
+                echo $(gettext "final.next_steps.secure_boot.error")
             fi
         fi
     fi
@@ -2507,22 +2821,18 @@ show_next_steps() {
     echo
     
     if [[ "$INSTALL_TYPE" == "compute-only" ]]; then
-        echo -e "${BLUE}计算专用安装说明:${NC}"
-        echo "- 此安装不包含桌面显卡组件 (OpenGL, Vulkan, X驱动等)"
-        echo "- 适用于计算集群或无显示器的工作站"
-        echo "- 如需添加桌面组件，可稍后安装相应包"
+        echo -e "${BLUE}$(gettext "final.notes.compute.header")${NC}"
+        echo $(gettext "final.notes.compute.notes")
     elif [[ "$INSTALL_TYPE" == "desktop-only" ]]; then
-        echo -e "${BLUE}桌面专用安装说明:${NC}"
-        echo "- 此安装不包含CUDA计算组件"
-        echo "- 适用于纯桌面/游戏用途"
-        echo "- 如需CUDA支持，可稍后安装nvidia-driver-cuda包"
+        echo -e "${BLUE}$(gettext "final.notes.desktop.header")${NC}"
+        echo -e "$(gettext "final.notes.desktop.notes")"
     fi
 }
 
 # 检查是否以root权限运行
 check_root() {
     if [[ $EUID -ne 0 ]]; then
-        exit_with_code $EXIT_NO_ROOT "此脚本需要root权限运行，请使用: sudo $0"
+        exit_with_code $EXIT_NO_ROOT "$(gettext "permission.error.root_required") sudo $0"
     fi
 }
 
@@ -2530,16 +2840,16 @@ check_root() {
 main() {
     # 检测终端环境，如果不是TTY则自动启用静默模式
     if [[ ! -t 0 ]] && [[ "$QUIET_MODE" != "true" ]]; then
-        log_info "检测到非交互环境，启用静默模式"
+        log_info $(gettext "main.info.non_interactive_quiet_mode")
         QUIET_MODE=true
     fi
 
     if ! [[ "$QUIET_MODE" == "true" ]]; then
         echo -e "${GREEN}"
         echo "=============================================="
-        echo "  NVIDIA驱动一键安装脚本 v2.2"
+        echo "  $(gettext "main.header.title") v${SCRIPT_VERSION}"
         if [[ "$AUTO_YES" == "true" ]]; then
-            echo "  无交互自动化模式"
+            echo "  $(gettext "main.header.auto_mode_subtitle")"
         fi
         echo "=============================================="
         echo -e "${NC}"
@@ -2558,11 +2868,11 @@ main() {
     local last_state=$(get_last_state)
     if [[ -n "$last_state" && "$last_state" != "installation_completed" ]]; then
         echo
-        log_warning "检测到未完成的安装状态: $last_state"
-        if ! [[ "$AUTO_YES" == "true" ]] && confirm "是否从上次中断处继续安装？" "N"; then
-            log_info "从断点继续安装"
+        log_warning "$(gettext "main.resume.warning_incomplete_state_found") $last_state"
+        if ! [[ "$AUTO_YES" == "true" ]] && confirm $(gettext "main.resume.confirm_resume_install") "N"; then
+            log_info "$(gettext "main.resume.info_resuming")"
         else
-            log_info "清理状态文件并重新开始"
+            log_info "$(gettext "main.resume.info_restarting")"
             rm -f "$STATE_FILE" "$ROLLBACK_FILE"
         fi
     fi
@@ -2596,19 +2906,19 @@ main() {
     # 显示安装配置
     if ! is_step_completed "show_config"; then
         echo
-        echo -e "${PURPLE}安装配置:${NC}"
-        echo "- 发行版: $DISTRO_ID $DISTRO_VERSION [$ARCH]"
-        echo "- 模块类型: $(if $USE_OPEN_MODULES; then echo "开源内核模块"; else echo "专有内核模块"; fi)"
-        echo "- 安装类型: $INSTALL_TYPE"
-        echo "- 仓库类型: $(if $USE_LOCAL_REPO; then echo "本地仓库"; else echo "网络仓库"; fi)"
-        echo "- 自动化模式: $(if $AUTO_YES; then echo "是"; else echo "否"; fi)"
-        echo "- 强制重装: $(if $FORCE_REINSTALL; then echo "是"; else echo "否"; fi)"
-        echo "- 自动重启: $(if $REBOOT_AFTER_INSTALL; then echo "是"; else echo "否"; fi)"
+        echo -e "${PURPLE}$(gettext "main.config_summary.header")${NC}"
+        echo "- $(gettext "main.config_summary.distro") $DISTRO_ID $DISTRO_VERSION [$ARCH]"
+        echo "- $(gettext "main.config_summary.module_type") $(if $USE_OPEN_MODULES; then echo $(gettext "module.type.open_kernel"); else echo $(gettext "module.type.proprietary"); fi)"
+        echo "- $(gettext "main.config_summary.install_type") $INSTALL_TYPE"
+        echo "- $(gettext "main.config_summary.repo_type") $(if $USE_LOCAL_REPO; then echo $(gettext "repository.type.local"); else echo $(gettext "repository.type.remote"); fi)"
+        echo "- $(gettext "main.config_summary.auto_mode") $(if $AUTO_YES; then echo $(gettext "common.yes"); else echo $(gettext "common.no"); fi)"
+        echo "- $(gettext "main.config_summary.force_reinstall") $(if $FORCE_REINSTALL; then echo $(gettext "common.yes"); else echo $(gettext "common.no"); fi)"
+        echo "- $(gettext "main.config_summary.auto_reboot") $(if $REBOOT_AFTER_INSTALL; then echo $(gettext "common.yes"); else echo $(gettext "common.no"); fi)"
         echo
 
         if ! [[ "$AUTO_YES" == "true" ]] && ! [[ "$FORCE_REINSTALL" == "true" ]] && ! [[ "$SKIP_EXISTING_CHECKS" == "true" ]]; then
-            if ! confirm "是否继续安装？" "Y"; then
-                exit_with_code $EXIT_USER_CANCELLED "用户取消安装"
+            if ! confirm $(gettext "main.config_summary.confirm") "Y"; then
+                exit_with_code $EXIT_USER_CANCELLED $(gettext "main.config_summary.user_cancel")
             fi
         fi
         save_state "show_config"
@@ -2616,7 +2926,7 @@ main() {
     
     # 开始安装过程
     echo
-    log_info "开始NVIDIA驱动安装过程..."
+    log_info $(gettext "main.install.starting")
     
     # 安装内核头文件
     install_kernel_headers
@@ -2700,53 +3010,53 @@ main() {
     # 根据驱动实际工作状态决定重启行为
     if [[ "$driver_working" == "true" ]]; then
         # 驱动正常工作，不需要重启
-        log_success "🎉 NVIDIA驱动安装成功并正常工作！"
-        echo "nvidia-smi测试通过，驱动已可正常使用，无需重启系统。"
+        log_success $(gettext "main.reboot_logic.success_no_reboot_needed")
+        echo $(gettext "main.reboot_logic.success_smi_passed")
         
         if [[ "$REBOOT_AFTER_INSTALL" == "true" ]]; then
-            log_info "尽管驱动已正常工作，但用户启用了自动重启选项"
-            log_info "正在重启系统..."
+            log_info $(gettext "main.reboot_logic.info_rebooting_on_user_request")
+            log_info $(gettext "main.reboot_logic.info_rebooting_now")
             cleanup_after_success
             reboot
         elif [[ "$AUTO_YES" == "true" ]]; then
-            log_success "自动化模式：驱动安装完成，无需重启"
+            log_success $(gettext "main.reboot_logic.success_auto_mode_no_reboot")
             cleanup_after_success
         else
             # 交互模式，询问用户是否要重启（但不建议）
-            if confirm "驱动已正常工作，是否仍要重启系统？" "N"; then
-                log_info "正在重启系统..."
+            if confirm $(gettext "main.reboot_logic.confirm_optional_reboot") "N"; then
+                log_info $(gettext "main.reboot_logic.info_rebooting_now")
                 cleanup_after_success
                 reboot
             else
-                log_info "已跳过重启，可立即使用NVIDIA驱动"
+                log_info $(gettext "main.reboot_logic.info_reboot_skipped")
                 cleanup_after_success
             fi
         fi
     else
         # 驱动未正常工作，需要重启
-        log_warning "⚠️  NVIDIA驱动需要重启系统才能正常工作"
-        echo "nvidia-smi测试失败，必须重启系统以完成驱动安装。"
+        log_warning $(gettext "main.reboot_logic.warning_reboot_required")
+        echo $(gettext "main.reboot_logic.warning_smi_failed_reboot_required")
         
         if [[ "$nouveau_needs_reboot" == "true" ]]; then
-            echo "原因：nouveau驱动无法完全卸载"
+            echo $(gettext "main.reboot_logic.reason_nouveau")
         elif [[ "$driver_needs_reboot" == "true" ]]; then
-            echo "原因：NVIDIA驱动模块需要重启后才能正常加载"
+            echo $(gettext "main.reboot_logic.reason_module_load")
         fi
         
         if [[ "$AUTO_YES" == "true" ]] || [[ "$REBOOT_AFTER_INSTALL" == "true" ]]; then
-            log_info "自动重启模式：正在重启系统..."
+            log_info $(gettext "main.reboot_logic.info_auto_mode_rebooting")
             rm -f "$STATE_FILE" "$ROLLBACK_FILE" "$STATE_DIR/nouveau_status" "$STATE_DIR/driver_status"
             cleanup_lock_files
             reboot
         else
-            if confirm "是否现在重启系统？" "Y"; then
-                log_info "正在重启系统..."
+            if confirm $(gettext "main.reboot_logic.confirm_reboot_now") "Y"; then
+                log_info $(gettext "main.reboot_logic.info_rebooting_now")
                 rm -f "$STATE_FILE" "$ROLLBACK_FILE" "$STATE_DIR/nouveau_status" "$STATE_DIR/driver_status"
                 cleanup_lock_files
                 reboot
             else
-                log_warning "请手动重启系统以完成驱动安装"
-                log_info "重启后可运行 'nvidia-smi' 验证驱动是否正常工作"
+                log_warning $(gettext "main.reboot_logic.warning_manual_reboot_needed")
+                log_info $(gettext "main.reboot_logic.info_verify_after_reboot")
                 # 保留状态文件供用户查看
                 cleanup_lock_files
             fi
