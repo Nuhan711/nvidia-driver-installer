@@ -677,6 +677,26 @@ cleanup_failed_install() {
     fi
 }
 
+cleanup_after_success() {
+    log_info "清理安装状态..."
+    
+    # 删除状态文件和回滚文件
+    if [[ -f "$STATE_FILE" ]]; then
+        rm -f "$STATE_FILE"
+        log_success "状态文件已删除: $STATE_FILE"
+    fi
+    
+    if [[ -f "$ROLLBACK_FILE" ]]; then
+        rm -f "$ROLLBACK_FILE"
+        log_success "回滚文件已删除: $ROLLBACK_FILE"
+    fi
+    
+    # 清理临时文件
+    cleanup_temp_files
+    
+    log_success "安装完成，所有状态已清理"
+}
+
 # 回滚安装
 rollback_installation() {
     log_info "开始回滚安装..."
@@ -885,8 +905,8 @@ check_nvidia_gpu() {
             log_success "检测到NVIDIA GPU #$gpu_count: $gpu_info"
             
             # 提取设备ID
-            local pci_line=$(lspci -n | grep "$(echo "$line" | awk '{print $1}')")
-            local device_id=$(echo "$pci_line" | awk -F'[: ]+' '/10de:/ {print $4}' | tr '[:lower:]' '[:upper:]')
+            local pci_address=$(echo "$line" | awk '{print $1}')
+            local device_id=$(lspci -s "$pci_address" -nn | grep -oP '10de:\K[0-9a-fA-F]{4}' | tr '[:lower:]' '[:upper:]')
             
             if [[ -n "$device_id" ]]; then
                 local architecture=$(detect_gpu_architecture "$device_id")
@@ -2140,31 +2160,178 @@ install_nvidia_suse() {
 disable_nouveau() {
     log_step "禁用nouveau开源驱动..."
     
-    # 创建黑名单文件
+    local need_reboot=false
+    local nouveau_active=false
+    
+    # 检查nouveau是否正在使用
+    if lsmod | grep -q "^nouveau"; then
+        nouveau_active=true
+        log_warning "检测到nouveau驱动正在运行"
+        
+        # 检查是否有进程正在使用nouveau
+        local processes_using_drm=$(lsof /dev/dri/* 2>/dev/null | wc -l)
+        if [[ $processes_using_drm -gt 0 ]]; then
+            log_warning "检测到有 $processes_using_drm 个进程正在使用图形设备"
+            
+            # 尝试停止图形相关服务
+            log_info "尝试停止图形服务以释放nouveau驱动..."
+            
+            # 停止显示管理器
+            local display_managers=("gdm" "lightdm" "sddm" "xdm" "kdm")
+            local stopped_services=()
+            
+            for dm in "${display_managers[@]}"; do
+                if systemctl is-active --quiet "$dm" 2>/dev/null; then
+                    log_info "停止显示管理器: $dm"
+                    systemctl stop "$dm" || log_warning "无法停止 $dm"
+                    stopped_services+=("$dm")
+                    sleep 2
+                fi
+            done
+            
+            # 尝试切换到文本模式
+            if [[ -n "${stopped_services[*]}" ]]; then
+                log_info "切换到文本模式..."
+                systemctl isolate multi-user.target 2>/dev/null || true
+                sleep 3
+            fi
+            
+            # 保存停止的服务信息，以便后续恢复
+            if [[ ${#stopped_services[@]} -gt 0 ]]; then
+                echo "${stopped_services[*]}" > "$STATE_DIR/stopped_display_managers"
+                save_rollback_info "systemctl start ${stopped_services[*]}"
+            fi
+        fi
+        
+        # 尝试卸载nouveau模块
+        log_info "尝试卸载nouveau驱动模块..."
+        
+        # 卸载相关模块（按依赖顺序）
+        local modules_to_remove=("nouveau" "ttm" "drm_kms_helper")
+        local failed_modules=()
+        
+        for module in "${modules_to_remove[@]}"; do
+            if lsmod | grep -q "^$module"; then
+                log_debug "尝试卸载模块: $module"
+                if modprobe -r "$module" 2>/dev/null; then
+                    log_success "成功卸载模块: $module"
+                else
+                    log_warning "无法卸载模块: $module"
+                    failed_modules+=("$module")
+                fi
+            fi
+        done
+        
+        # 检查nouveau是否完全卸载
+        if lsmod | grep -q "^nouveau"; then
+            log_error "nouveau模块仍在运行，需要重启系统才能完全禁用"
+            need_reboot=true
+        else
+            log_success "nouveau模块已成功卸载"
+            nouveau_active=false
+        fi
+    else
+        log_info "nouveau驱动未运行"
+    fi
+    
+    # 创建黑名单文件（无论如何都要创建）
+    log_info "创建nouveau黑名单配置..."
     cat > /etc/modprobe.d/blacklist-nvidia-nouveau.conf << EOF
+# 禁用nouveau开源驱动，由NVIDIA安装脚本生成
 blacklist nouveau
 options nouveau modeset=0
 EOF
     
+    save_rollback_info "rm -f /etc/modprobe.d/blacklist-nvidia-nouveau.conf"
+    
     # 更新initramfs
+    log_info "更新initramfs以确保nouveau在启动时被禁用..."
     case $DISTRO_ID in
         ubuntu|debian)
-            update-initramfs -u
+            if ! update-initramfs -u; then
+                log_warning "更新initramfs失败，可能影响下次启动"
+            fi
             ;;
         rhel|rocky|ol|almalinux|fedora|kylin|amzn)
             if command -v dracut &> /dev/null; then
-                dracut -f
+                if ! dracut -f; then
+                    log_warning "更新initramfs失败，可能影响下次启动"
+                fi
+            else
+                log_warning "dracut命令未找到，无法更新initramfs"
             fi
             ;;
         opensuse*|sles)
-            mkinitrd
+            if ! mkinitrd; then
+                log_warning "更新initramfs失败，可能影响下次启动"
+            fi
             ;;
         azurelinux|mariner)
             if command -v dracut &> /dev/null; then
-                dracut -f
+                if ! dracut -f; then
+                    log_warning "更新initramfs失败，可能影响下次启动"
+                fi
+            else
+                log_warning "dracut命令未找到，无法更新initramfs"
             fi
             ;;
     esac
+    
+    # 如果成功卸载了nouveau，尝试重启显示服务
+    if [[ "$nouveau_active" == "false" && -f "$STATE_DIR/stopped_display_managers" ]]; then
+        local stopped_services
+        read -r stopped_services < "$STATE_DIR/stopped_display_managers"
+        
+        if [[ -n "$stopped_services" ]]; then
+            log_info "nouveau已禁用，重启显示服务..."
+            # 切换回图形模式
+            systemctl isolate graphical.target 2>/dev/null || true
+            sleep 2
+            
+            # 重启显示管理器
+            for dm in $stopped_services; do
+                log_info "重启显示管理器: $dm"
+                systemctl start "$dm" || log_warning "无法重启 $dm"
+            done
+            
+            rm -f "$STATE_DIR/stopped_display_managers"
+        fi
+    fi
+    
+    # 报告状态并决定后续行动
+    if [[ "$need_reboot" == "true" ]]; then
+        log_warning "nouveau驱动需要重启系统才能完全禁用"
+        echo "NOUVEAU_NEEDS_REBOOT=true" > "$STATE_DIR/nouveau_status"
+        
+        echo
+        log_error "⚠️  重要提醒：需要重启系统"
+        echo "nouveau驱动仍在运行中，必须重启系统后才能继续安装NVIDIA驱动"
+        echo "这通常发生在以下情况："
+        echo "• 有图形程序正在使用nouveau驱动"
+        echo "• nouveau模块被其他模块依赖"
+        echo "• 系统正在图形模式下运行"
+        echo
+        
+        if [[ "$AUTO_YES" == "true" ]]; then
+            log_info "自动化模式：保存当前状态，重启后将自动继续安装"
+            save_state "nouveau_disabled_need_reboot"
+            reboot
+        else
+            if confirm "是否现在重启系统？重启后请重新运行安装脚本" "Y"; then
+                log_info "正在重启系统，重启后请重新运行安装脚本..."
+                save_state "nouveau_disabled_need_reboot"
+                reboot
+            else
+                exit_with_code $EXIT_NOUVEAU_DISABLE_FAILED "用户选择不重启，无法继续安装"
+            fi
+        fi
+    else
+        log_success "nouveau驱动已成功禁用，继续安装NVIDIA驱动"
+        echo "NOUVEAU_NEEDS_REBOOT=false" > "$STATE_DIR/nouveau_status"
+        
+        # 既然nouveau已经成功禁用，就不需要在最终重启逻辑中额外处理
+        # 继续正常的安装流程
+    fi
 }
 
 # 启用persistence daemon
@@ -2183,25 +2350,35 @@ enable_persistence_daemon() {
 verify_installation() {
     log_step "验证NVIDIA驱动安装..."
     
+    local driver_working=false
+    local needs_reboot=false
+    
     # 检查驱动版本
     if [[ -f /proc/driver/nvidia/version ]]; then
         local driver_version=$(cat /proc/driver/nvidia/version | head -1)
         log_success "NVIDIA驱动已加载: $driver_version"
     else
-        log_warning "NVIDIA驱动模块未加载（可能需要重启）"
+        log_warning "NVIDIA驱动模块未加载"
+        needs_reboot=true
     fi
     
     # 检查nvidia-smi
     if command -v nvidia-smi &> /dev/null; then
         log_success "nvidia-smi工具可用"
+        log_info "测试NVIDIA驱动功能..."
+        
         if nvidia-smi &> /dev/null; then
+            log_success "NVIDIA驱动工作正常！"
+            driver_working=true
             echo
             nvidia-smi
         else
-            log_warning "nvidia-smi执行失败（可能需要重启系统）"
+            log_error "nvidia-smi执行失败，驱动未正常工作"
+            needs_reboot=true
         fi
     else
         log_warning "nvidia-smi命令不可用"
+        needs_reboot=true
     fi
     
     # 检查模块类型
@@ -2214,6 +2391,19 @@ verify_installation() {
             local module_version=$(cat /sys/module/nvidia/version 2>/dev/null || echo "未知")
             log_info "模块版本: $module_version"
         fi
+    fi
+    
+    # 保存验证结果
+    if [[ "$driver_working" == "true" ]]; then
+        echo "DRIVER_WORKING=true" > "$STATE_DIR/driver_status"
+    else
+        echo "DRIVER_WORKING=false" > "$STATE_DIR/driver_status"
+    fi
+    
+    if [[ "$needs_reboot" == "true" ]]; then
+        echo "NEEDS_REBOOT=true" >> "$STATE_DIR/driver_status"
+    else
+        echo "NEEDS_REBOOT=false" >> "$STATE_DIR/driver_status"
     fi
 }
 
@@ -2256,12 +2446,29 @@ show_next_steps() {
     echo "- 安装类型: $INSTALL_TYPE"
     echo "- 仓库类型: $(if $USE_LOCAL_REPO; then echo "本地仓库"; else echo "网络仓库"; fi)"
     echo
+    
+    # 根据驱动工作状态显示不同的后续步骤
+    local driver_working=false
+    if [[ -f "$STATE_DIR/driver_status" ]]; then
+        local driver_status=$(grep "DRIVER_WORKING" "$STATE_DIR/driver_status" | cut -d= -f2)
+        if [[ "$driver_status" == "true" ]]; then
+            driver_working=true
+        fi
+    fi
+    
     echo -e "${YELLOW}后续步骤:${NC}"
-    echo "1. 重启系统以确保驱动完全生效"
-    echo "2. 重启后运行 'nvidia-smi' 验证安装"
-    echo "3. 如需安装CUDA Toolkit，请访问: https://docs.nvidia.com/cuda/cuda-installation-guide-linux/"
-    echo "4. 技术支持论坛: https://forums.developer.nvidia.com/c/gpu-graphics/linux/148"
-    echo "5. 如遇问题，可运行 '$0 --rollback' 回滚安装"
+    if [[ "$driver_working" == "true" ]]; then
+        echo "1. ✅ 驱动已正常工作，可立即使用NVIDIA GPU"
+        echo "2. 如需安装CUDA Toolkit，请访问: https://docs.nvidia.com/cuda/cuda-installation-guide-linux/"
+        echo "3. 技术支持论坛: https://forums.developer.nvidia.com/c/gpu-graphics/linux/148"
+        echo "4. 如遇问题，可运行 '$0 --rollback' 回滚安装"
+    else
+        echo "1. 重启系统以确保驱动完全生效"
+        echo "2. 重启后运行 'nvidia-smi' 验证安装"
+        echo "3. 如需安装CUDA Toolkit，请访问: https://docs.nvidia.com/cuda/cuda-installation-guide-linux/"
+        echo "4. 技术支持论坛: https://forums.developer.nvidia.com/c/gpu-graphics/linux/148"
+        echo "5. 如遇问题，可运行 '$0 --rollback' 回滚安装"
+    fi
     
     # Secure Boot相关提示
     if [[ -d /sys/firmware/efi/efivars ]] && [[ -f /sys/firmware/efi/efivars/SecureBoot-* ]]; then
@@ -2269,9 +2476,13 @@ show_next_steps() {
         if [[ "$sb_value" =~ 1$ ]]; then
             echo
             echo -e "${YELLOW}🔐 Secure Boot提醒：${NC}"
-            echo "6. 重启时如果出现MOK Manager界面，请选择 'Enroll MOK' 并输入密码"
-            echo "7. 如果驱动无法加载，检查: sudo dmesg | grep nvidia"
-            echo "8. 验证模块签名: modinfo nvidia | grep sig"
+            if [[ "$driver_working" == "true" ]]; then
+                echo "6. ✅ MOK密钥已正确配置，驱动正常工作"
+            else
+                echo "6. 重启时如果出现MOK Manager界面，请选择 'Enroll MOK' 并输入密码"
+                echo "7. 如果驱动无法加载，检查: sudo dmesg | grep nvidia"
+                echo "8. 验证模块签名: modinfo nvidia | grep sig"
+            fi
         fi
     fi
     
@@ -2287,18 +2498,6 @@ show_next_steps() {
         echo "- 此安装不包含CUDA计算组件"
         echo "- 适用于纯桌面/游戏用途"
         echo "- 如需CUDA支持，可稍后安装nvidia-driver-cuda包"
-    fi
-    
-    if [[ "$USE_OPEN_MODULES" == "true" ]]; then
-        echo -e "${BLUE}开源模块说明:${NC}"
-        echo "- 使用MIT/GPLv2双重许可的开源内核模块"
-        echo "- 支持Turing及更新架构 (RTX 16xx, 20xx, 30xx, 40xx系列)"
-        echo "- 源代码: https://github.com/NVIDIA/open-gpu-kernel-modules"
-    else
-        echo -e "${BLUE}专有模块说明:${NC}"
-        echo "- 使用NVIDIA传统专有内核模块"
-        echo "- 兼容所有NVIDIA GPU架构"
-        echo "- Maxwell、Pascal、Volta架构必须使用此模块"
     fi
 }
 
@@ -2320,8 +2519,7 @@ main() {
     if ! [[ "$QUIET_MODE" == "true" ]]; then
         echo -e "${GREEN}"
         echo "=============================================="
-        echo "  NVIDIA驱动官方安装脚本 v2.1"
-        echo "  基于NVIDIA Driver Installation Guide r575"
+        echo "  NVIDIA驱动一键安装脚本 v2.2"
         if [[ "$AUTO_YES" == "true" ]]; then
             echo "  无交互自动化模式"
         fi
@@ -2453,37 +2651,87 @@ main() {
     # 显示后续步骤
     show_next_steps
     
-    echo
-    if [ "$REBOOT_AFTER_INSTALL" = true ] || [ "$AUTO_YES" = true ]; then
-        if [ "$REBOOT_AFTER_INSTALL" = true ]; then
-            log_info "自动重启已启用，正在重启系统..."
-        else
-            log_info "自动化模式：建议重启系统以完成驱动安装"
-            if confirm "是否现在重启系统？" "Y"; then
-                log_info "正在重启系统..."
-            else
-                log_warning "请手动重启系统以完成驱动安装"
-                log_info "安装完成后可运行 '$0 --cleanup' 清理状态文件"
-                exit $EXIT_SUCCESS
-            fi
+    # 检查是否需要重启系统
+    local nouveau_needs_reboot=false
+    local driver_needs_reboot=false
+    local driver_working=false
+    
+    # 检查nouveau状态
+    if [[ -f "$STATE_DIR/nouveau_status" ]]; then
+        local nouveau_status=$(grep "NOUVEAU_NEEDS_REBOOT" "$STATE_DIR/nouveau_status" | cut -d= -f2)
+        if [[ "$nouveau_status" == "true" ]]; then
+            nouveau_needs_reboot=true
+        fi
+    fi
+    
+    # 检查驱动工作状态
+    if [[ -f "$STATE_DIR/driver_status" ]]; then
+        local driver_status=$(grep "DRIVER_WORKING" "$STATE_DIR/driver_status" | cut -d= -f2)
+        local needs_reboot_status=$(grep "NEEDS_REBOOT" "$STATE_DIR/driver_status" | cut -d= -f2)
+        
+        if [[ "$driver_status" == "true" ]]; then
+            driver_working=true
         fi
         
-        # 清理状态文件，因为安装已完成
-        rm -f "$STATE_FILE" "$ROLLBACK_FILE"
-        cleanup_lock_files
-        reboot
-    else
-        if confirm "是否现在重启系统？" "N"; then
+        if [[ "$needs_reboot_status" == "true" ]]; then
+            driver_needs_reboot=true
+        fi
+    fi
+    
+    echo
+    # 根据驱动实际工作状态决定重启行为
+    if [[ "$driver_working" == "true" ]]; then
+        # 驱动正常工作，不需要重启
+        log_success "🎉 NVIDIA驱动安装成功并正常工作！"
+        echo "nvidia-smi测试通过，驱动已可正常使用，无需重启系统。"
+        
+        if [[ "$REBOOT_AFTER_INSTALL" == "true" ]]; then
+            log_info "尽管驱动已正常工作，但用户启用了自动重启选项"
             log_info "正在重启系统..."
-            # 清理状态文件，因为安装已完成
-            rm -f "$STATE_FILE" "$ROLLBACK_FILE"
+            cleanup_after_success
+            reboot
+        elif [[ "$AUTO_YES" == "true" ]]; then
+            log_success "自动化模式：驱动安装完成，无需重启"
+            cleanup_after_success
+        else
+            # 交互模式，询问用户是否要重启（但不建议）
+            if confirm "驱动已正常工作，是否仍要重启系统？" "N"; then
+                log_info "正在重启系统..."
+                cleanup_after_success
+                reboot
+            else
+                log_info "已跳过重启，可立即使用NVIDIA驱动"
+                cleanup_after_success
+            fi
+        fi
+    else
+        # 驱动未正常工作，需要重启
+        log_warning "⚠️  NVIDIA驱动需要重启系统才能正常工作"
+        echo "nvidia-smi测试失败，必须重启系统以完成驱动安装。"
+        
+        if [[ "$nouveau_needs_reboot" == "true" ]]; then
+            echo "原因：nouveau驱动无法完全卸载"
+        elif [[ "$driver_needs_reboot" == "true" ]]; then
+            echo "原因：NVIDIA驱动模块需要重启后才能正常加载"
+        fi
+        
+        if [[ "$AUTO_YES" == "true" ]] || [[ "$REBOOT_AFTER_INSTALL" == "true" ]]; then
+            log_info "自动重启模式：正在重启系统..."
+            rm -f "$STATE_FILE" "$ROLLBACK_FILE" "$STATE_DIR/nouveau_status" "$STATE_DIR/driver_status"
             cleanup_lock_files
             reboot
         else
-            log_warning "请手动重启系统以完成驱动安装"
-            log_info "安装完成后可运行 '$0 --cleanup' 清理状态文件"
-            # 清理锁文件但保留状态文件
-            cleanup_lock_files
+            if confirm "是否现在重启系统？" "Y"; then
+                log_info "正在重启系统..."
+                rm -f "$STATE_FILE" "$ROLLBACK_FILE" "$STATE_DIR/nouveau_status" "$STATE_DIR/driver_status"
+                cleanup_lock_files
+                reboot
+            else
+                log_warning "请手动重启系统以完成驱动安装"
+                log_info "重启后可运行 'nvidia-smi' 验证驱动是否正常工作"
+                # 保留状态文件供用户查看
+                cleanup_lock_files
+            fi
         fi
     fi
 }
