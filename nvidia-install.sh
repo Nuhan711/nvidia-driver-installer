@@ -834,6 +834,8 @@ LANG_PACK_EN_US=(
 
 gettext() {
     local msgid="$1"
+    local translation=""
+    
     # 根据当前语言获取翻译
     case "$LANG_CURRENT" in
         "zh-cn"|"zh"|"zh_CN")
@@ -853,7 +855,7 @@ gettext() {
         translation="$msgid"
     fi
     
-    echo "$translation"
+    printf '%s' "$translation"  # 使用 printf 而不是 echo
 }
 
 # 优雅退出处理
@@ -880,7 +882,7 @@ cleanup_on_exit() {
     
     # 如果安装过程中被中断，保存当前状态
     if [[ "$signal" != "EXIT" ]] && [[ -f "$STATE_FILE" ]]; then
-        log_info $(gettext "exit.handler.state_saved_for_resume")
+        log_info "$(gettext "exit.handler.state_saved_for_resume")"
     fi
     
     # 释放可能的锁文件
@@ -902,7 +904,7 @@ cleanup_on_exit() {
 
 # 清理临时文件
 cleanup_temp_files() {
-    log_debug $(gettext "exit.handler.temp_files_starting")
+    log_debug "$(gettext "exit.handler.temp_files_starting")"
     find /tmp -maxdepth 1 \( \
         -name "nvidia-driver-local-repo-*.rpm" -o \
         -name "nvidia-driver-local-repo-*.deb" -o \
@@ -936,7 +938,7 @@ create_install_lock() {
         if [[ -n "$lock_pid" ]] && kill -0 "$lock_pid" 2>/dev/null; then
             exit_with_code $EXIT_STATE_FILE_CORRUPTED "$(gettext "state.lock.error.another_install_running") $lock_pid"
         else
-            log_warning $(gettext "state.lock.cleaning_orphaned_file")
+            log_warning "$(gettext "state.lock.cleaning_orphaned_file")"
             rm -f "$lock_file"
         fi
     fi
@@ -976,42 +978,42 @@ exit_with_code() {
 get_exit_code_description() {
     local code=$1
     case $code in
-        0) echo $(gettext "exit_code.success") ;;
-        1) echo $(gettext "exit_code.permission.no_root") ;;
-        2) echo $(gettext "exit_code.permission.fs_denied") ;;
-        3) echo $(gettext "exit_code.permission.state_dir_failed") ;;
-        10) echo $(gettext "exit_code.hardware.no_gpu_detected") ;;
-        11) echo $(gettext "exit_code.hardware.lspci_unavailable") ;;
-        12) echo $(gettext "exit_code.hardware.gpu_arch_incompatible") ;;
-        20) echo $(gettext "exit_code.compatibility.unsupported_os") ;;
-        21) echo $(gettext "exit_code.compatibility.unsupported_version") ;;
-        22) echo $(gettext "exit_code.compatibility.unsupported_arch") ;;
-        30) echo $(gettext "exit_code.config.invalid_args") ;;
-        31) echo $(gettext "exit_code.config.invalid_install_type") ;;
-        32) echo $(gettext "exit_code.config.module_arch_mismatch") ;;
-        40) echo $(gettext "exit_code.secure_boot.user_exit") ;;
-        41) echo $(gettext "exit_code.secure_boot.auto_failed") ;;
-        42) echo $(gettext "exit_code.secure_boot.mok_operation_failed") ;;
-        43) echo $(gettext "exit_code.secure_boot.mok_tools_missing") ;;
-        50) echo $(gettext "exit_code.conflict.existing_driver_user_exit") ;;
-        51) echo $(gettext "exit_code.conflict.driver_uninstall_failed") ;;
-        52) echo $(gettext "exit_code.conflict.nouveau_disable_failed") ;;
-        60) echo $(gettext "exit_code.network.connection_failed") ;;
-        61) echo $(gettext "exit_code.network.repo_download_failed") ;;
-        62) echo $(gettext "exit_code.network.keyring_download_failed") ;;
-        70) echo $(gettext "exit_code.pkg_manager.unavailable") ;;
-        71) echo $(gettext "exit_code.pkg_manager.repo_add_failed") ;;
-        72) echo $(gettext "exit_code.pkg_manager.dependency_install_failed") ;;
-        73) echo $(gettext "exit_code.pkg_manager.kernel_headers_failed") ;;
-        74) echo $(gettext "exit_code.pkg_manager.nvidia_install_failed") ;;
-        80) echo $(gettext "exit_code.pkg_manager.kernel_version_issue") ;;
-        81) echo $(gettext "exit_code.pkg_manager.dkms_build_failed") ;;
-        82) echo $(gettext "exit_code.pkg_manager.module_signing_failed") ;;
-        83) echo $(gettext "exit_code.pkg_manager.driver_validation_failed") ;;
-        90) echo $(gettext "exit_code.pkg_manager.rollback_file_missing") ;;
-        91) echo $(gettext "exit_code.pkg_manager.rollback_failed") ;;
-        92) echo $(gettext "exit_code.state_management.state_file_corrupted") ;;
-        100) echo $(gettext "exit_code.user_cancelled") ;;
+        0) echo "$(gettext "exit_code.success")" ;;
+        1) echo "$(gettext "exit_code.permission.no_root")" ;;
+        2) echo "$(gettext "exit_code.permission.fs_denied")" ;;
+        3) echo "$(gettext "exit_code.permission.state_dir_failed")" ;;
+        10) echo "$(gettext "exit_code.hardware.no_gpu_detected")" ;;
+        11) echo "$(gettext "exit_code.hardware.lspci_unavailable")" ;;
+        12) echo "$(gettext "exit_code.hardware.gpu_arch_incompatible")" ;;
+        20) echo "$(gettext "exit_code.compatibility.unsupported_os")" ;;
+        21) echo "$(gettext "exit_code.compatibility.unsupported_version")" ;;
+        22) echo "$(gettext "exit_code.compatibility.unsupported_arch")" ;;
+        30) echo "$(gettext "exit_code.config.invalid_args")" ;;
+        31) echo "$(gettext "exit_code.config.invalid_install_type")" ;;
+        32) echo "$(gettext "exit_code.config.module_arch_mismatch")" ;;
+        40) echo "$(gettext "exit_code.secure_boot.user_exit")" ;;
+        41) echo "$(gettext "exit_code.secure_boot.auto_failed")" ;;
+        42) echo "$(gettext "exit_code.secure_boot.mok_operation_failed")" ;;
+        43) echo "$(gettext "exit_code.secure_boot.mok_tools_missing")" ;;
+        50) echo "$(gettext "exit_code.conflict.existing_driver_user_exit")" ;;
+        51) echo "$(gettext "exit_code.conflict.driver_uninstall_failed")" ;;
+        52) echo "$(gettext "exit_code.conflict.nouveau_disable_failed")" ;;
+        60) echo "$(gettext "exit_code.network.connection_failed")" ;;
+        61) echo "$(gettext "exit_code.network.repo_download_failed")" ;;
+        62) echo "$(gettext "exit_code.network.keyring_download_failed")" ;;
+        70) echo "$(gettext "exit_code.pkg_manager.unavailable")" ;;
+        71) echo "$(gettext "exit_code.pkg_manager.repo_add_failed")" ;;
+        72) echo "$(gettext "exit_code.pkg_manager.dependency_install_failed")" ;;
+        73) echo "$(gettext "exit_code.pkg_manager.kernel_headers_failed")" ;;
+        74) echo "$(gettext "exit_code.pkg_manager.nvidia_install_failed")" ;;
+        80) echo "$(gettext "exit_code.pkg_manager.kernel_version_issue")" ;;
+        81) echo "$(gettext "exit_code.pkg_manager.dkms_build_failed")" ;;
+        82) echo "$(gettext "exit_code.pkg_manager.module_signing_failed")" ;;
+        83) echo "$(gettext "exit_code.pkg_manager.driver_validation_failed")" ;;
+        90) echo "$(gettext "exit_code.pkg_manager.rollback_file_missing")" ;;
+        91) echo "$(gettext "exit_code.pkg_manager.rollback_failed")" ;;
+        92) echo "$(gettext "exit_code.state_management.state_file_corrupted")" ;;
+        100) echo "$(gettext "exit_code.user_cancelled")" ;;
         *) echo "$(gettext "exit_code.unknown") $code" ;;
     esac
 }
@@ -1187,67 +1189,67 @@ NVIDIA驱动安装脚本 - 退出码说明
 
 EOF
 
-    echo $(gettext "exit_code.permission")
+    echo "$(gettext "exit_code.permission")"
     for code in 1 2 3; do
         printf "  %-3s - %s\n" "$code" "$(get_exit_code_description $code)"
     done
     echo
 
-    echo $(gettext "exit_code.hardware")
+    echo "$(gettext "exit_code.hardware")"
     for code in 10 11 12; do
         printf "  %-3s - %s\n" "$code" "$(get_exit_code_description $code)"
     done
     echo
 
-    echo $(gettext "exit_code.compatibility")
+    echo "$(gettext "exit_code.compatibility")"
     for code in 20 21 22; do
         printf "  %-3s - %s\n" "$code" "$(get_exit_code_description $code)"
     done
     echo
 
-    echo $(gettext "exit_code.config")
+    echo "$(gettext "exit_code.config")"
     for code in 30 31 32; do
         printf "  %-3s - %s\n" "$code" "$(get_exit_code_description $code)"
     done
     echo
 
-    echo $(gettext "exit_code.secure_boot")
+    echo "$(gettext "exit_code.secure_boot")"
     for code in 40 41 42 43; do
         printf "  %-3s - %s\n" "$code" "$(get_exit_code_description $code)"
     done
     echo
 
-    echo $(gettext "exit_code.conflict")
+    echo "$(gettext "exit_code.conflict")"
     for code in 50 51 52; do
         printf "  %-3s - %s\n" "$code" "$(get_exit_code_description $code)"
     done
     echo
 
-    echo $(gettext "exit_code.network")
+    echo "$(gettext "exit_code.network")"
     for code in 60 61 62; do
         printf "  %-3s - %s\n" "$code" "$(get_exit_code_description $code)"
     done
     echo
 
-    echo $(gettext "exit_code.pkg_manager")
+    echo "$(gettext "exit_code.pkg_manager")"
     for code in 70 71 72 73 74; do
         printf "  %-3s - %s\n" "$code" "$(get_exit_code_description $code)"
     done
     echo
 
-    echo $(gettext "exit_code.system_state")
+    echo "$(gettext "exit_code.system_state")"
     for code in 80 81 82 83; do
         printf "  %-3s - %s\n" "$code" "$(get_exit_code_description $code)"
     done
     echo
 
-    echo $(gettext "exit_code.state_management")
+    echo "$(gettext "exit_code.state_management")"
     for code in 90 91 92; do
         printf "  %-3s - %s\n" "$code" "$(get_exit_code_description $code)"
     done
     echo
 
-    echo $(gettext "exit_code.user_cancelled")
+    echo "$(gettext "exit_code.user_cancelled")"
     for code in 100; do
         printf "  %-3s - %s\n" "$code" "$(get_exit_code_description $code)"
     done
@@ -1369,9 +1371,9 @@ parse_arguments() {
     
     # 自动化模式下的合理默认值
     if [[ "$AUTO_YES" == "true" ]]; then
-        log_debug $(gettext "args.info.auto_mode_enabled")
+        log_debug "$(gettext "args.info.auto_mode_enabled")"
         if [[ "$QUIET_MODE" == "true" ]]; then
-            log_debug $(gettext "args.info.quiet_mode_enabled")
+            log_debug "$(gettext "args.info.quiet_mode_enabled")"
         fi
     fi
 }
@@ -1414,26 +1416,26 @@ save_rollback_info() {
 
 # 清理失败的安装状态
 cleanup_failed_install() {
-    log_info $(gettext "cleanup.failed.starting")
-    
+    log_info "$(gettext "cleanup.failed.starting")"
+
     if [[ -f "$STATE_FILE" ]]; then
-        log_info $(gettext "cleanup.failed.previous_state_found")
+        log_info "$(gettext "cleanup.failed.previous_state_found")"
         if [[ "$QUIET_MODE" != "true" ]]; then
             cat "$STATE_FILE"
         fi
-        
-        if confirm $(gettext "cleanup.failed.confirm_cleanup") "N"; then
+
+        if confirm "$(gettext "cleanup.failed.confirm_cleanup")" "N"; then
             rm -f "$STATE_FILE" "$ROLLBACK_FILE"
-            log_success $(gettext "cleanup.failed.state_cleaned")
+            log_success "$(gettext "cleanup.failed.state_cleaned")"
         fi
     else
-        log_info $(gettext "cleanup.failed.no_state_found")
+        log_info "$(gettext "cleanup.failed.no_state_found")"
     fi
 }
 
 cleanup_after_success() {
-    log_info $(gettext "cleanup.success.starting")
-    
+    log_info "$(gettext "cleanup.success.starting")"
+
     # 删除状态文件和回滚文件
     if [[ -f "$STATE_FILE" ]]; then
         rm -f "$STATE_FILE"
@@ -1447,20 +1449,20 @@ cleanup_after_success() {
     
     # 清理临时文件
     cleanup_temp_files
-    
-    log_success $(gettext "cleanup.success.all_states_cleaned")
+
+    log_success "$(gettext "cleanup.success.all_states_cleaned")"
 }
 
 # 回滚安装
 rollback_installation() {
-    log_info $(gettext "rollback.starting")
-    
+    log_info "$(gettext "rollback.starting")"
+
     if [[ ! -f "$ROLLBACK_FILE" ]]; then
         exit_with_code $EXIT_ROLLBACK_FILE_MISSING "$(gettext "rollback.error.rollback_file_missing") $ROLLBACK_FILE"
     fi
-    
-    log_warning $(gettext "rollback.warning.changes_will_be_undone")
-    if confirm $(gettext "rollback.confirm.proceed") "N"; then
+
+    log_warning "$(gettext "rollback.warning.changes_will_be_undone")"
+    if confirm "$(gettext "rollback.confirm.proceed")" "N"; then
         # 从后往前执行回滚操作
         local rollback_failed=false
         tac "$ROLLBACK_FILE" | while read -r action; do
@@ -1472,21 +1474,21 @@ rollback_installation() {
         done
 
         if [[ "$rollback_failed" == "true" ]]; then
-            exit_with_code $EXIT_ROLLBACK_FAILED $(gettext "rollback.error.partial_failure")
+            exit_with_code $EXIT_ROLLBACK_FAILED "$(gettext "rollback.error.partial_failure")"
         fi
         
         # 清理状态文件
         rm -f "$STATE_FILE" "$ROLLBACK_FILE"
-        log_success $(gettext "rollback.success")
+        log_success "$(gettext "rollback.success")"
     else
-        exit_with_code $EXIT_USER_CANCELLED $(gettext "rollback.error.user_cancelled")
+        exit_with_code $EXIT_USER_CANCELLED "$(gettext "rollback.error.user_cancelled")"
     fi
 }
 
 # 检测操作系统发行版
 detect_distro() {
-    log_step $(gettext "detect.os.starting")
-    
+    log_step "$(gettext "detect.os.starting")"
+
     if [[ -f /etc/os-release ]]; then
         source /etc/os-release
         DISTRO_ID=$ID
@@ -1634,16 +1636,16 @@ is_open_module_supported() {
 
 # 检查NVIDIA GPU并确定架构兼容性
 check_nvidia_gpu() {
-    log_step $(gettext "detect.gpu.starting")
+    log_step "$(gettext "detect.gpu.starting")"
     
     if ! command -v lspci &> /dev/null; then
-        exit_with_code $EXIT_LSPCI_UNAVAILABLE $(gettext "detect.gpu.error.lspci_missing")
+        exit_with_code $EXIT_LSPCI_UNAVAILABLE "$(gettext "detect.gpu.error.lspci_missing")"
     fi
     
     if ! lspci | grep -i nvidia > /dev/null 2>&1; then
-        exit_with_code $EXIT_NO_NVIDIA_GPU $(gettext "detect.gpu.error.no_gpu_found")
+        exit_with_code $EXIT_NO_NVIDIA_GPU "$(gettext "detect.gpu.error.no_gpu_found")"
     fi
-    
+
     # 初始化GPU数据库
     init_gpu_database
     
@@ -1686,41 +1688,41 @@ check_nvidia_gpu() {
     done < <(lspci | grep -i nvidia)
     
     if [[ $gpu_count -eq 0 ]]; then
-        exit_with_code $EXIT_NO_NVIDIA_GPU $(gettext "detect.gpu.error.no_gpu_found")
+        exit_with_code $EXIT_NO_NVIDIA_GPU "$(gettext "detect.gpu.error.no_gpu_found")"
     fi
     
     # 处理兼容性问题
     if [[ "$USE_OPEN_MODULES" == "true" ]] && [[ "$has_incompatible_gpu" == "true" ]]; then
         echo
-        log_error $(gettext "detect.gpu.old_gpu_found_warning")
+        log_error "$(gettext "detect.gpu.old_gpu_found_warning")"
         echo -e "${RED}$(gettext "detect.gpu.open_support_prompt")${NC}"
-        echo $(gettext "detect.gpu.info.open_support_list")
-        echo $(gettext "detect.gpu.info.open_unsupport_list")
+        echo "$(gettext "detect.gpu.info.open_support_list")"
+        echo "$(gettext "detect.gpu.info.open_unsupport_list")"
         echo
 
         if ! [[ "$AUTO_YES" == "true" ]]; then
-            echo $(gettext "detect.gpu.incompatible.solution_prompt")
-            echo $(gettext "detect.gpu.incompatible.solution_option1")
-            echo $(gettext "detect.gpu.incompatible.solution_option2")
+            echo "$(gettext "detect.gpu.incompatible.solution_prompt")"
+            echo "$(gettext "detect.gpu.incompatible.solution_option1")"
+            echo "$(gettext "detect.gpu.incompatible.solution_option2")"
             echo
-            
-            if confirm $(gettext "detect.gpu.incompatible.confirm") "Y"; then
-                log_info $(gettext "detect.gpu.incompatible.switch")
+
+            if confirm "$(gettext "detect.gpu.incompatible.confirm")" "Y"; then
+                log_info "$(gettext "detect.gpu.incompatible.switch")"
                 USE_OPEN_MODULES=false
             else
-                log_warning $(gettext "detect.gpu.incompatible.continue_warning")
+                log_warning "$(gettext "detect.gpu.incompatible.continue_warning")"
             fi
         else
             # 自动化模式下的默认行为：切换到专有模块
-            log_warning $(gettext "detect.gpu.incompatible.auto_mode_switch")
+            log_warning "$(gettext "detect.gpu.incompatible.auto_mode_switch")"
             USE_OPEN_MODULES=false
         fi
     fi
     
     # 显示最终配置摘要
     echo
-    log_info $(gettext "detect.gpu.summary.header")
-    printf "%-15s %-20s %-15s\n" $(gettext "detect.gpu.summary.header.gpu_number") $(gettext "detect.gpu.summary.header.architecture") $(gettext "detect.gpu.summary.header.module_type")
+    log_info "$(gettext "detect.gpu.summary.header")"
+    printf "%-15s %-20s %-15s\n" "$(gettext "detect.gpu.summary.header.gpu_number")" "$(gettext "detect.gpu.summary.header.architecture")" "$(gettext "detect.gpu.summary.header.module_type")"
     printf "%-15s %-20s %-15s\n" "-------" "--------" "--------"
     
     for i in "${!detected_architectures[@]}"; do
@@ -1742,14 +1744,14 @@ check_nvidia_gpu() {
     
     if [ "$USE_OPEN_MODULES" = true ] && [ "$has_incompatible_gpu" = true ]; then
         echo
-        log_warning $(gettext "detect.gpu.summary.note.fallback")
+        log_warning "$(gettext "detect.gpu.summary.note.fallback")"
     fi
 }
 
 # 智能发行版版本检查
 check_distro_support() {
-    log_step $(gettext "detect.distro_support.starting")
-    
+    log_step "$(gettext "detect.distro_support.starting")"
+
     local is_supported=true
     local support_level="full"  # full, partial, unsupported
     local warning_msg=""
@@ -1758,7 +1760,7 @@ check_distro_support() {
         rhel|rocky|ol|almalinux)
             case $DISTRO_VERSION in
                 8|9|10) support_level="full" ;;
-                7) support_level="partial"; warning_msg=$(gettext "detect.distro_support.warning.rhel7_eol") ;;
+                7) support_level="partial"; warning_msg="$(gettext "detect.distro_support.warning.rhel7_eol")" ;;
                 *) support_level="unsupported"; warning_msg="$(gettext "detect.distro_support.error.unsupported_rhel_version") $DISTRO_VERSION" ;;
             esac
             ;;
@@ -1777,7 +1779,7 @@ check_distro_support() {
         ubuntu)
             case $DISTRO_VERSION in
                 20.04|22.04|24.04) support_level="full" ;;
-                18.04) support_level="partial"; warning_msg=$(gettext "detect.distro_support.warning.ubuntu1804_eol") ;;
+                18.04) support_level="partial"; warning_msg="$(gettext "detect.distro_support.warning.ubuntu1804_eol")" ;;
                 *) 
                     # 尝试从codename判断
                     if [[ -n "$DISTRO_CODENAME" ]]; then
@@ -1839,14 +1841,14 @@ check_distro_support() {
             ;;
         "partial")
             log_warning "$(gettext "detect.distro_support.warning.partially_supported") $warning_msg"
-            if ! confirm $(gettext "detect.distro_support.prompt.confirm.continue_install") "N"; then
-                exit_with_code $EXIT_USER_CANCELLED $(gettext "detect.distro_support.user_cancelled")
+            if ! confirm "$(gettext "detect.distro_support.prompt.confirm.continue_install")" "N"; then
+                exit_with_code $EXIT_USER_CANCELLED "$(gettext "detect.distro_support.user_cancelled")"
             fi
             ;;
         "unsupported")
             log_error "$(gettext "detect.distro_support.error.unsupported") $warning_msg"
             echo
-            echo $(gettext "detect.distro_support.info.supported_list_header")
+            echo "$(gettext "detect.distro_support.info.supported_list_header")"
             echo "- RHEL/Rocky/Oracle Linux: 8, 9, 10"
             echo "- Fedora: 39-42"
             echo "- Ubuntu: 20.04, 22.04, 24.04"
@@ -1856,10 +1858,10 @@ check_distro_support() {
             echo "- Azure Linux: 2.0, 3.0"
             echo "- KylinOS: 10"
             echo
-            if ! confirm $(gettext "detect.distro_support.prompt.confirm.force_install") "N"; then
+            if ! confirm "$(gettext "detect.distro_support.prompt.confirm.force_install")" "N"; then
                 exit_with_code $EXIT_UNSUPPORTED_VERSION "$(gettext "exit_code.compatibility.unsupported_version") $DISTRO_ID $DISTRO_VERSION"
             fi
-            log_warning $(gettext "detect.distro_support.warning.force_mode_issues")
+            log_warning "$(gettext "detect.distro_support.warning.force_mode_issues")"
             ;;
     esac
 }
@@ -1867,19 +1869,19 @@ check_distro_support() {
 # 检查现有NVIDIA驱动安装
 check_existing_nvidia_installation() {
     if [[ "$SKIP_EXISTING_CHECKS" == "true" ]]; then
-        log_info $(gettext "detect.existing_driver.skipping_check")
+        log_info "$(gettext "detect.existing_driver.skipping_check")"
         return 0
     fi
-    
-    log_step $(gettext "detect.existing_driver.starting")
-    
+
+    log_step "$(gettext "detect.existing_driver.starting")"
+
     local existing_driver=""
     local installation_method=""
     
     # 检查是否有NVIDIA内核模块
     if lsmod | grep -q nvidia; then
         existing_driver="kernel_module"
-        log_warning $(gettext "detect.existing_driver.warning.kernel_module_loaded")
+        log_warning "$(gettext "detect.existing_driver.warning.kernel_module_loaded")"
         lsmod | grep nvidia
     fi
     
@@ -1889,7 +1891,7 @@ check_existing_nvidia_installation() {
             if dpkg -l | grep -q nvidia-driver; then
                 existing_driver="package_manager"
                 installation_method="apt/dpkg"
-                log_warning $(gettext "detect.existing_driver.warning.pkg_manager_install")
+                log_warning "$(gettext "detect.existing_driver.warning.pkg_manager_install")"
                 dpkg -l | grep nvidia-driver
             fi
             ;;
@@ -1897,7 +1899,7 @@ check_existing_nvidia_installation() {
             if rpm -qa | grep -q nvidia-driver; then
                 existing_driver="package_manager"
                 installation_method="dnf/rpm"
-                log_warning $(gettext "detect.existing_driver.warning.pkg_manager_install")
+                log_warning "$(gettext "detect.existing_driver.warning.pkg_manager_install")"
                 rpm -qa | grep nvidia
             fi
             ;;
@@ -1905,7 +1907,7 @@ check_existing_nvidia_installation() {
             if zypper search -i | grep -q nvidia; then
                 existing_driver="package_manager"
                 installation_method="zypper"
-                log_warning $(gettext "detect.existing_driver.warning.pkg_manager_install")
+                log_warning "$(gettext "detect.existing_driver.warning.pkg_manager_install")"
                 zypper search -i | grep nvidia
             fi
             ;;
@@ -1915,20 +1917,20 @@ check_existing_nvidia_installation() {
     if [[ -f /usr/bin/nvidia-uninstall ]]; then
         existing_driver="runfile"
         installation_method="runfile"
-        log_warning $(gettext "detect.existing_driver.warning.runfile_install")
+        log_warning "$(gettext "detect.existing_driver.warning.runfile_install")"
     fi
     
     # 检查其他PPA或第三方源
     case $DISTRO_ID in
         ubuntu)
             if apt-cache policy | grep -q "graphics-drivers"; then
-                log_warning $(gettext "detect.existing_driver.warning.ppa_found")
+                log_warning "$(gettext "detect.existing_driver.warning.ppa_found")"
                 installation_method="${installation_method:+$installation_method, }graphics-drivers PPA"
             fi
             ;;
         fedora)
             if dnf repolist | grep -q rpmfusion; then
-                log_warning $(gettext "detect.existing_driver.warning.rpm_fusion_found")
+                log_warning "$(gettext "detect.existing_driver.warning.rpm_fusion_found")"
                 installation_method="${installation_method:+$installation_method, }RPM Fusion"
             fi
             ;;
@@ -1937,59 +1939,59 @@ check_existing_nvidia_installation() {
     # 处理现有安装 (支持自动化)
     if [[ -n "$existing_driver" ]]; then
         echo
-        log_error $(gettext "detect.existing_driver.error.driver_found")
+        log_error "$(gettext "detect.existing_driver.error.driver_found")"
         echo "$(gettext "detect.existing_driver.info.install_method") $installation_method"
         echo
 
         if ! [[ "$FORCE_REINSTALL" == "true" ]] && ! [[ "$AUTO_YES" == "true" ]]; then
             echo -e "$(gettext "detect.existing_driver.prompt.user_choice")"
             echo
-            
-            local choice=$(select_option $(gettext "prompt.select_option.please_select") "1" \
-                $(gettext "prompt.select_option.existing_driver.choice_uninstall") \
-                $(gettext "prompt.select_option.existing_driver.choice_force") \
-                $(gettext "prompt.select_option.existing_driver.choice_skip") \
-                $(gettext "prompt.select_option.existing_driver.choice_exit"))
+
+            local choice=$(select_option "$(gettext "prompt.select_option.please_select")" "1" \
+                "$(gettext "prompt.select_option.existing_driver.choice_uninstall")" \
+                "$(gettext "prompt.select_option.existing_driver.choice_force")" \
+                "$(gettext "prompt.select_option.existing_driver.choice_skip")" \
+                "$(gettext "prompt.select_option.existing_driver.choice_exit")")
 
             case $choice in
                 1)
                     uninstall_existing_nvidia_driver "$existing_driver"
                     ;;
                 2)
-                    log_warning $(gettext "detect.existing_driver.warning.force_reinstall_mode")
+                    log_warning "$(gettext "detect.existing_driver.warning.force_reinstall_mode")"
                     FORCE_REINSTALL=true
                     ;;
                 3)
-                    log_warning $(gettext "detect.existing_driver.warning.skip_mode")
+                    log_warning "$(gettext "detect.existing_driver.warning.skip_mode")"
                     SKIP_EXISTING_CHECKS=true
                     ;;
                 4)
-                    exit_with_code $EXIT_EXISTING_DRIVER_USER_EXIT $(gettext "detect.existing_driver.exit.user_choice")
+                    exit_with_code $EXIT_EXISTING_DRIVER_USER_EXIT "$(gettext "detect.existing_driver.exit.user_choice")"
                     ;;
             esac
         elif [[ "$AUTO_YES" == "true" ]] && ! [[ "$FORCE_REINSTALL" == "true" ]]; then
             # 自动化模式下的默认行为：卸载现有驱动
-            log_warning $(gettext "detect.existing_driver.warning.auto_mode_uninstall")
+            log_warning "$(gettext "detect.existing_driver.warning.auto_mode_uninstall")"
             uninstall_existing_nvidia_driver "$existing_driver"
         else
-            log_warning $(gettext "detect.existing_driver.warning.force_mode_skip_uninstall")
+            log_warning "$(gettext "detect.existing_driver.warning.force_mode_skip_uninstall")"
         fi
     else
-        log_success $(gettext "detect.existing_driver.success.no_driver_found")
+        log_success "$(gettext "detect.existing_driver.success.no_driver_found")"
     fi
 }
 
 # 卸载现有NVIDIA驱动
 uninstall_existing_nvidia_driver() {
     local driver_type="$1"
-    
-    log_step $(gettext "uninstall.existing_driver.starting")
-    
+
+    log_step "$(gettext "uninstall.existing_driver.starting")"
+
     case $driver_type in
         "runfile")
             if [[ -f /usr/bin/nvidia-uninstall ]]; then
-                log_info $(gettext "uninstall.existing_driver.info.using_runfile_uninstaller")
-                /usr/bin/nvidia-uninstall --silent || log_warning $(gettext "uninstall.existing_driver.warning.runfile_uninstall_incomplete")
+                log_info "$(gettext "uninstall.existing_driver.info.using_runfile_uninstaller")"
+                /usr/bin/nvidia-uninstall --silent || log_warning "$(gettext "uninstall.existing_driver.warning.runfile_uninstall_incomplete")"
             fi
             ;;
         "package_manager")
@@ -2015,20 +2017,20 @@ uninstall_existing_nvidia_driver() {
     
     # 清理模块
     if lsmod | grep -q nvidia; then
-        log_info $(gettext "uninstall.existing_driver.info.removing_kernel_modules")
-        rmmod nvidia_drm nvidia_modeset nvidia_uvm nvidia || log_warning $(gettext "uninstall.existing_driver.warning.module_removal_failed")
+        log_info "$(gettext "uninstall.existing_driver.info.removing_kernel_modules")"
+        rmmod nvidia_drm nvidia_modeset nvidia_uvm nvidia || log_warning "$(gettext "uninstall.existing_driver.warning.module_removal_failed")"
     fi
     
     # 清理配置文件
     rm -rf /etc/modprobe.d/*nvidia* /etc/X11/xorg.conf.d/*nvidia* || true
-    
-    log_success $(gettext "uninstall.existing_driver.success")
+
+    log_success "$(gettext "uninstall.existing_driver.success")"
 }
 
 # 检测Secure Boot状态
 check_secure_boot() {
-    log_step $(gettext "secure_boot.check.starting")
-    
+    log_step "$(gettext "secure_boot.check.starting")"
+
     local secure_boot_enabled=false
     local secure_boot_method=""
     
@@ -2070,7 +2072,7 @@ check_secure_boot() {
     if [[ "$secure_boot_enabled" == "true" ]]; then
         handle_secure_boot_enabled
     else
-        log_success $(gettext "secure_boot.check.disabled_or_unsupported")
+        log_success "$(gettext "secure_boot.check.disabled_or_unsupported")"
     fi
 }
 
@@ -2081,7 +2083,7 @@ handle_secure_boot_enabled() {
     echo -e "${RED}██                          ⚠️  $(gettext "secure_boot.check.warning")  ⚠️                            ██${NC}"
     echo -e "${RED}██████████████████████████████████████████████████████████████████████████████${NC}"
     echo
-    log_error $(gettext "secure_boot.enabled.error_detected")
+    log_error "$(gettext "secure_boot.enabled.error_detected")"
     echo
     echo -e "${YELLOW}🚨 $(gettext "secure_boot.enabled.why_is_problem") ${NC}"
     echo -e "$(gettext "secure_boot.enabled.why_is_problem_detail")"
@@ -2098,9 +2100,9 @@ handle_secure_boot_enabled() {
     echo -e "$(gettext "secure_boot.enabled.solution.prebuilt_steps")"
     echo
     echo -e "${YELLOW}$(gettext "secure_boot.enabled.solution.mok_setup")${NC}"
-    echo -e $(gettext "secure_boot.enabled.solution.mok_setup_notice")
+    echo -e "$(gettext "secure_boot.enabled.solution.mok_setup_notice")"
     echo
-    
+
     # 检查是否已有MOK密钥
     local has_existing_mok=false
     if [[ -f /var/lib/shim-signed/mok/MOK.der ]] || [[ -f /var/lib/dkms/mok.pub ]]; then
@@ -2114,43 +2116,43 @@ handle_secure_boot_enabled() {
     echo
 
     if ! [[ "$AUTO_YES" == "true" ]]; then
-        echo -e $(gettext "secure_boot.enabled.choose_action.prompt")
+        echo -e "$(gettext "secure_boot.enabled.choose_action.prompt")"
         echo
-        
-        local choice=$(select_option $(gettext "prompt.select_option.please_select") "1" \
-            $(gettext "secure_boot.enabled.choice.exit") \
-            $(gettext "secure_boot.enabled.choice.sign") \
-            $(gettext "secure_boot.enabled.choice.force"))
-        
+
+        local choice=$(select_option "$(gettext "prompt.select_option.please_select")" "1" \
+            "$(gettext "secure_boot.enabled.choice.exit")" \
+            "$(gettext "secure_boot.enabled.choice.sign")" \
+            "$(gettext "secure_boot.enabled.choice.force")")
+
         case $choice in
             1)
-                log_info $(gettext "secure_boot.enabled.exit.cancelled_user_fix")
+                log_info "$(gettext "secure_boot.enabled.exit.cancelled_user_fix")"
                 echo
                 echo -e "$(gettext "secure_boot.enabled.exit.useful_commands")"
                 echo
-                exit_with_code $EXIT_SECURE_BOOT_USER_EXIT $(gettext "secure_boot.enabled.exit.user_choice")
+                exit_with_code $EXIT_SECURE_BOOT_USER_EXIT "$(gettext "secure_boot.enabled.exit.user_choice")"
                 ;;
             2)
                 setup_mok_signing
                 ;;
             3)
-                log_warning $(gettext "secure_boot.enabled.warning.user_forced_install")
+                log_warning "$(gettext "secure_boot.enabled.warning.user_forced_install")"
                 ;;
         esac
     else
         # 自动化模式下的行为
         if [[ "$has_existing_mok" == "true" ]]; then
-            log_warning $(gettext "secure_boot.enabled.warning.auto_mode_existing_mok")
+            log_warning "$(gettext "secure_boot.enabled.warning.auto_mode_existing_mok")"
         else
-            exit_with_code $EXIT_SECURE_BOOT_AUTO_FAILED $(gettext "secure_boot.enabled.error.auto_mode_failure")
+            exit_with_code $EXIT_SECURE_BOOT_AUTO_FAILED "$(gettext "secure_boot.enabled.error.auto_mode_failure")"
         fi
     fi
 }
 
 # 设置MOK密钥签名
 setup_mok_signing() {
-    log_step $(gettext "mok.setup.starting")
-    
+    log_step "$(gettext "mok.setup.starting")"
+
     # 检查必要工具
     local missing_tools=()
     for tool in mokutil openssl; do
@@ -2161,7 +2163,7 @@ setup_mok_signing() {
     
     if [[ ${#missing_tools[@]} -gt 0 ]]; then
         log_error "$(gettext "mok.setup.error.tools_missing") ${missing_tools[*]}"
-        echo $(gettext "mok.setup.error.please_install_tools")
+        echo "$(gettext "mok.setup.error.please_install_tools")"
         case $DISTRO_ID in
             ubuntu|debian)
                 echo "sudo apt install mokutil openssl"
@@ -2184,16 +2186,16 @@ setup_mok_signing() {
     if [[ -f /var/lib/shim-signed/mok/MOK.priv ]] && [[ -f /var/lib/shim-signed/mok/MOK.der ]]; then
         mok_key_path="/var/lib/shim-signed/mok/MOK.priv"
         mok_cert_path="/var/lib/shim-signed/mok/MOK.der"
-        log_info $(gettext "mok.setup.info.using_ubuntu_key")
+        log_info "$(gettext "mok.setup.info.using_ubuntu_key")"
     # DKMS路径
     elif [[ -f /var/lib/dkms/mok.key ]] && [[ -f /var/lib/dkms/mok.der ]]; then
         mok_key_path="/var/lib/dkms/mok.key"
         mok_cert_path="/var/lib/dkms/mok.der"
-        log_info $(gettext "mok.setup.info.using_dkms_key")
+        log_info "$(gettext "mok.setup.info.using_dkms_key")"
     else
         # 生成新的MOK密钥
-        log_info $(gettext "mok.setup.info.generating_new_key")
-        
+        log_info "$(gettext "mok.setup.info.generating_new_key")"
+
         # 创建目录
         mkdir -p /var/lib/dkms
         
@@ -2205,7 +2207,7 @@ setup_mok_signing() {
             -out /var/lib/dkms/mok.der \
             -nodes -days 36500 \
             -subj "/CN=NVIDIA Driver MOK Signing Key"; then
-            exit_with_code $EXIT_MOK_OPERATION_FAILED $(gettext "mok.setup.error.generation_failed")
+            exit_with_code $EXIT_MOK_OPERATION_FAILED "$(gettext "mok.setup.error.generation_failed")"
         fi
         
         # 也生成PEM格式的公钥供参考
@@ -2213,22 +2215,22 @@ setup_mok_signing() {
         
         mok_key_path="/var/lib/dkms/mok.key"
         mok_cert_path="/var/lib/dkms/mok.der"
-        
-        log_success $(gettext "mok.setup.success.generation_complete")
+
+        log_success "$(gettext "mok.setup.success.generation_complete")"
     fi
     
     # 注册MOK密钥
-    log_info $(gettext "mok.setup.info.enrolling_key")
+    log_info "$(gettext "mok.setup.info.enrolling_key")"
     echo
     echo -e "${YELLOW}$(gettext "mok.setup.enroll.important_note_header")${NC}"
     echo -e "$(gettext "mok.setup.enroll.note")"
     echo
     
     if ! mokutil --import "$mok_cert_path"; then
-        exit_with_code $EXIT_MOK_OPERATION_FAILED $(gettext "mok.setup.error.enroll_failed")
+        exit_with_code $EXIT_MOK_OPERATION_FAILED "$(gettext "mok.setup.error.enroll_failed")"
     fi
-    
-    log_success $(gettext "mok.setup.success.enroll_queued")
+
+    log_success "$(gettext "mok.setup.success.enroll_queued")"
     echo
     echo -e "${GREEN}$(gettext "mok.setup.next_steps.header")${NC}"
     echo -e "$(gettext "mok.setup.enroll.next_steps")"
@@ -2243,9 +2245,9 @@ setup_mok_signing() {
 configure_dkms_signing() {
     local key_path="$1"
     local cert_path="$2"
-    
-    log_info $(gettext "配置DKMS自动签名...")
-    
+
+    log_info "$(gettext "配置DKMS自动签名...")"
+
     # 配置DKMS签名工具
     if [[ -f /etc/dkms/framework.conf ]]; then
         # 启用签名工具
@@ -2268,21 +2270,21 @@ EOF
     echo "SIGN_TOOL=\"/etc/dkms/sign_helper.sh\"" > /etc/dkms/nvidia.conf
     
     save_rollback_info "rm -f /etc/dkms/sign_helper.sh /etc/dkms/nvidia.conf"
-    
-    log_success $(gettext "dkms.signing.configuring")
+
+    log_success "$(gettext "dkms.signing.configuring")"
 }
 
 # 预安装检查集合
 pre_installation_checks() {
-    log_step $(gettext "pre_check.starting")
-    
+    log_step "$(gettext "pre_check.starting")"
+
     # 检查Secure Boot状态
     check_secure_boot
     
     # 检查根分区空间
     local root_space=$(df / | awk 'NR==2 {print $4}')
     if [[ $root_space -lt 1048576 ]]; then  # 1GB
-        log_warning $(gettext "root.partition.space.insufficient")
+        log_warning "$(gettext "root.partition.space.insufficient")"
     fi
     
     # 检查是否在虚拟机中运行
@@ -2296,10 +2298,10 @@ pre_installation_checks() {
     local kernel_version=$(uname -r)
     if [[ "$kernel_version" =~ (custom|zen|liquorix) ]]; then
         log_warning "$(gettext "pre_check.warning.custom_kernel_detected") $kernel_version"
-        echo $(gettext "pre_check.custom_kernel.note")
+        echo "$(gettext "pre_check.custom_kernel.note")"
     fi
-    
-    log_success $(gettext "pre_check.success")
+
+    log_success "$(gettext "pre_check.success")"
 }
 
 # 获取发行版特定的变量
@@ -2372,7 +2374,7 @@ safe_add_repository() {
             ;;
         "apt")
             if [[ -f "/etc/apt/sources.list.d/$repo_name.list" ]] || grep -q "$repo_url" /etc/apt/sources.list.d/*.list 2>/dev/null; then
-                log_info $(gettext "repo.add.exists")
+                log_info "$(gettext "repo.add.exists")"
             else
                 log_info "$(gettext "repo.add.adding") $repo_name"
                 if [[ -n "$key_url" ]]; then
@@ -2462,44 +2464,44 @@ safe_install_package() {
             save_rollback_info "$package_manager remove -y $pkg"
         done
     else
-        log_info $(gettext "pkg_install.info.all_packages_exist")
+        log_info "$(gettext "pkg_install.info.all_packages_exist")"
     fi
 }
 
 # 启用第三方仓库和依赖
 enable_repositories() {
     if is_step_completed "enable_repositories"; then
-        log_info $(gettext "repo.enable.already_done")
+        log_info "$(gettext "repo.enable.already_done")"
         return 0
     fi
     
-    log_step $(gettext "repo.enable.starting")
+    log_step "$(gettext "repo.enable.starting")"
     
     case $DISTRO_ID in
         rhel)
             # RHEL需要subscription-manager启用仓库
             if [[ "$DISTRO_VERSION" == "10" ]]; then
-                subscription-manager repos --enable=rhel-10-for-${ARCH}-appstream-rpms || log_warning $(gettext "repo.enable.error.rhel_appstream")
-                subscription-manager repos --enable=rhel-10-for-${ARCH}-baseos-rpms || log_warning $(gettext "repo.enable.error.rhel_baseos")
-                subscription-manager repos --enable=codeready-builder-for-rhel-10-${ARCH}-rpms || log_warning $(gettext "repo.enable.error.rhel_crb")
-                
+                subscription-manager repos --enable=rhel-10-for-${ARCH}-appstream-rpms || log_warning "$(gettext "repo.enable.error.rhel_appstream")"
+                subscription-manager repos --enable=rhel-10-for-${ARCH}-baseos-rpms || log_warning "$(gettext "repo.enable.error.rhel_baseos")"
+                subscription-manager repos --enable=codeready-builder-for-rhel-10-${ARCH}-rpms || log_warning "$(gettext "repo.enable.error.rhel_crb")"
+
                 # 安装EPEL
                 if ! rpm -q epel-release &>/dev/null; then
                     dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-10.noarch.rpm
                     save_rollback_info "dnf remove -y epel-release"
                 fi
             elif [[ "$DISTRO_VERSION" == "9" ]]; then
-                subscription-manager repos --enable=rhel-9-for-${ARCH}-appstream-rpms || log_warning $(gettext "repo.enable.error.rhel_appstream")
-                subscription-manager repos --enable=rhel-9-for-${ARCH}-baseos-rpms || log_warning $(gettext "repo.enable.error.rhel_baseos")
-                subscription-manager repos --enable=codeready-builder-for-rhel-9-${ARCH}-rpms || log_warning $(gettext "repo.enable.error.rhel_crb")
+                subscription-manager repos --enable=rhel-9-for-${ARCH}-appstream-rpms || log_warning "$(gettext "repo.enable.error.rhel_appstream")"
+                subscription-manager repos --enable=rhel-9-for-${ARCH}-baseos-rpms || log_warning "$(gettext "repo.enable.error.rhel_baseos")"
+                subscription-manager repos --enable=codeready-builder-for-rhel-9-${ARCH}-rpms || log_warning "$(gettext "repo.enable.error.rhel_crb")"
                 if ! rpm -q epel-release &>/dev/null; then
                     dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm
                     save_rollback_info "dnf remove -y epel-release"
                 fi
             elif [[ "$DISTRO_VERSION" == "8" ]]; then
-                subscription-manager repos --enable=rhel-8-for-${ARCH}-appstream-rpms || log_warning $(gettext "repo.enable.error.rhel_appstream")
-                subscription-manager repos --enable=rhel-8-for-${ARCH}-baseos-rpms || log_warning $(gettext "repo.enable.error.rhel_baseos")
-                subscription-manager repos --enable=codeready-builder-for-rhel-8-${ARCH}-rpms || log_warning $(gettext "repo.enable.error.rhel_crb")
+                subscription-manager repos --enable=rhel-8-for-${ARCH}-appstream-rpms || log_warning "$(gettext "repo.enable.error.rhel_appstream")"
+                subscription-manager repos --enable=rhel-8-for-${ARCH}-baseos-rpms || log_warning "$(gettext "repo.enable.error.rhel_baseos")"
+                subscription-manager repos --enable=codeready-builder-for-rhel-8-${ARCH}-rpms || log_warning "$(gettext "repo.enable.error.rhel_crb")"
                 if ! rpm -q epel-release &>/dev/null; then
                     dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm
                     save_rollback_info "dnf remove -y epel-release"
@@ -2560,7 +2562,7 @@ enable_repositories() {
         opensuse*|sles)
             # 启用PackageHub
             if command -v SUSEConnect >/dev/null 2>&1 && ! SUSEConnect -l | grep -q PackageHub; then
-                SUSEConnect --product PackageHub/15/$(uname -m) || log_warning $(gettext "repo.enable.error.suse_packagehub")
+                SUSEConnect --product PackageHub/15/$(uname -m) || log_warning "$(gettext "repo.enable.error.suse_packagehub")"
                 save_rollback_info "SUSEConnect -d --product PackageHub/15/$(uname -m)"
             fi
             
@@ -2583,12 +2585,12 @@ enable_repositories() {
 # 安装内核头文件和开发包
 install_kernel_headers() {
     if is_step_completed "install_kernel_headers"; then
-        log_info $(gettext "kernel_headers.install.already_done")
+        log_info "$(gettext "kernel_headers.install.already_done")"
         return 0
     fi
-    
-    log_step $(gettext "kernel_headers.install.starting")
-    
+
+    log_step "$(gettext "kernel_headers.install.starting")"
+
     local kernel_version=$(uname -r)
     
     case $DISTRO_ID in
@@ -2630,10 +2632,10 @@ install_kernel_headers() {
 
 # 安装本地仓库
 install_local_repository() {
-    log_info $(gettext "repo.local.setup.starting")
-    
+    log_info "$(gettext "repo.local.setup.starting")"
+
     local version=${DRIVER_VERSION:-"latest"}
-    local base_url="https://developer.download.nvidia.com/compute/nvidia-driver"
+    local base_url="https://developer.download.nvidia.cn/compute/nvidia-driver"
     
     case $DISTRO_ID in
         rhel|rocky|ol|almalinux|fedora|amzn|azurelinux|mariner|kylin)
@@ -2662,11 +2664,11 @@ install_local_repository() {
 
 # 安装网络仓库 
 install_network_repository() {
-    log_info $(gettext "repo.network.setup.starting")
+    log_info "$(gettext "repo.network.setup.starting")"
 
     case $DISTRO_ID in
         rhel|rocky|ol|almalinux|fedora|amzn|kylin)
-            local repo_url="https://developer.download.nvidia.com/compute/cuda/repos/${DISTRO_REPO}/${ARCH}/cuda-${DISTRO_REPO}.repo"
+            local repo_url="https://developer.download.nvidia.cn/compute/cuda/repos/${DISTRO_REPO}/${ARCH}/cuda-${DISTRO_REPO}.repo"
             safe_add_repository "dnf" "$repo_url" "cuda-${DISTRO_REPO}"
             
             # 清理缓存
@@ -2678,14 +2680,14 @@ install_network_repository() {
         ubuntu|debian)
             # 检查并安装cuda-keyring
             if ! dpkg -l cuda-keyring &>/dev/null; then
-                local keyring_url="https://developer.download.nvidia.com/compute/cuda/repos/${DISTRO_REPO}/${ARCH}/cuda-keyring_1.1-1_all.deb"
-                log_info $(gettext "repo.network.setup.installing_keyring")
+                local keyring_url="https://developer.download.nvidia.cn/compute/cuda/repos/${DISTRO_REPO}/${ARCH}/cuda-keyring_1.1-1_all.deb"
+                log_info "$(gettext "repo.network.setup.installing_keyring")"
                 wget -O /tmp/cuda-keyring.deb "$keyring_url"
                 dpkg -i /tmp/cuda-keyring.deb
                 save_rollback_info "dpkg -r cuda-keyring"
                 rm -f /tmp/cuda-keyring.deb
             else
-                log_info $(gettext "repo.network.setup.keyring_exists")
+                log_info "$(gettext "repo.network.setup.keyring_exists")"
             fi
             
             if ! is_step_completed "apt_update_after_repo"; then
@@ -2694,7 +2696,7 @@ install_network_repository() {
             fi
             ;;
         opensuse*|sles)
-            local repo_url="https://developer.download.nvidia.com/compute/cuda/repos/${DISTRO_REPO}/${ARCH}/cuda-${DISTRO_REPO}.repo"
+            local repo_url="https://developer.download.nvidia.cn/compute/cuda/repos/${DISTRO_REPO}/${ARCH}/cuda-${DISTRO_REPO}.repo"
             safe_add_repository "zypper" "$repo_url" "cuda-${DISTRO_REPO}"
             
             if ! is_step_completed "zypper_refresh_after_repo"; then
@@ -2703,7 +2705,7 @@ install_network_repository() {
             fi
             ;;
         azurelinux|mariner)
-            local repo_url="https://developer.download.nvidia.com/compute/cuda/repos/${DISTRO_REPO}/${ARCH}/cuda-${DISTRO_REPO}.repo"
+            local repo_url="https://developer.download.nvidia.cn/compute/cuda/repos/${DISTRO_REPO}/${ARCH}/cuda-${DISTRO_REPO}.repo"
             safe_add_repository "dnf" "$repo_url" "cuda-${DISTRO_REPO}"
             
             if ! is_step_completed "tdnf_cache_cleared"; then
@@ -2717,12 +2719,12 @@ install_network_repository() {
 # 添加NVIDIA官方仓库
 add_nvidia_repository() {
     if is_step_completed "add_nvidia_repository"; then
-        log_info $(gettext "repo.nvidia.add.already_done")
+        log_info "$(gettext "repo.nvidia.add.already_done")"
         return 0
     fi
-    
-    log_step $(gettext "repo.nvidia.add.starting")
-    
+
+    log_step "$(gettext "repo.nvidia.add.starting")"
+
     get_distro_vars
 
     if [[ "$USE_LOCAL_REPO" == "true" ]]; then
@@ -2739,7 +2741,7 @@ enable_dnf_modules() {
     case $DISTRO_ID in
         rhel|rocky|ol|almalinux)
             if [[ "$DISTRO_VERSION" =~ ^(8|9) ]]; then
-                log_step $(gettext "dnf_module.enable.starting")
+                log_step "$(gettext "dnf_module.enable.starting")"
                 if [[ "$USE_OPEN_MODULES" == "true" ]]; then
                     dnf module enable -y nvidia-driver:open-dkms
                 else
@@ -2748,7 +2750,7 @@ enable_dnf_modules() {
             fi
             ;;
         kylin|amzn)
-            log_step $(gettext "dnf_module.enable.starting")
+            log_step "$(gettext "dnf_module.enable.starting")"
             if [[ "$USE_OPEN_MODULES" == "true" ]]; then
                 dnf module enable -y nvidia-driver:open-dkms
             else
@@ -2866,7 +2868,7 @@ install_nvidia_suse() {
 
 # 禁用nouveau驱动
 disable_nouveau() {
-    log_step $(gettext "nouveau.disable.starting")
+    log_step "$(gettext "nouveau.disable.starting")"
     
     local need_reboot=false
     local nouveau_active=false
@@ -2874,16 +2876,16 @@ disable_nouveau() {
     # 检查nouveau是否正在使用
     if lsmod | grep -q "^nouveau"; then
         nouveau_active=true
-        log_warning $(gettext "nouveau.disable.warning.detected_running")
-        
+        log_warning "$(gettext "nouveau.disable.warning.detected_running")"
+
         # 检查是否有进程正在使用nouveau
         local processes_using_drm=$(lsof /dev/dri/* 2>/dev/null | wc -l)
         if [[ $processes_using_drm -gt 0 ]]; then
-            log_warning "$processes_using_drm ${gettext "nouveau.disable.warning.processes_using_drm"}"
-            
+            log_warning "$processes_using_drm $(gettext "nouveau.disable.warning.processes_using_drm")"
+
             # 尝试停止图形相关服务
-            log_info $(gettext "nouveau.disable.info.stopping_display_manager")
-            
+            log_info "$(gettext "nouveau.disable.info.stopping_display_manager")"
+
             # 停止显示管理器
             local display_managers=("gdm" "lightdm" "sddm" "xdm" "kdm")
             local stopped_services=()
@@ -2899,7 +2901,7 @@ disable_nouveau() {
             
             # 尝试切换到文本模式
             if [[ -n "${stopped_services[*]}" ]]; then
-                log_info $(gettext "nouveau.disable.info.switching_to_text_mode")
+                log_info "$(gettext "nouveau.disable.info.switching_to_text_mode")"
                 systemctl isolate multi-user.target 2>/dev/null || true
                 sleep 3
             fi
@@ -2912,7 +2914,7 @@ disable_nouveau() {
         fi
         
         # 尝试卸载nouveau模块
-        log_info $(gettext "nouveau.disable.info.unloading_module")
+        log_info "$(gettext "nouveau.disable.info.unloading_module")"
         
         # 卸载相关模块（按依赖顺序）
         local modules_to_remove=("nouveau" "ttm" "drm_kms_helper")
@@ -2932,18 +2934,18 @@ disable_nouveau() {
         
         # 检查nouveau是否完全卸载
         if lsmod | grep -q "^nouveau"; then
-            log_error $(gettext "nouveau.disable.error.still_running_reboot_needed")
+            log_error "$(gettext "nouveau.disable.error.still_running_reboot_needed")"
             need_reboot=true
         else
-            log_success $(gettext "nouveau.disable.success.module_unloaded_all")
+            log_success "$(gettext "nouveau.disable.success.module_unloaded_all")"
             nouveau_active=false
         fi
     else
-        log_info $(gettext "nouveau.disable.info.not_running")
+        log_info "$(gettext "nouveau.disable.info.not_running")"
     fi
     
     # 创建黑名单文件（无论如何都要创建）
-    log_info $(gettext "nouveau.disable.info.creating_blacklist")
+    log_info "$(gettext "nouveau.disable.info.creating_blacklist")"
     cat > /etc/modprobe.d/blacklist-nvidia-nouveau.conf << EOF
 # 禁用nouveau开源驱动，由NVIDIA安装脚本生成
 blacklist nouveau
@@ -2953,34 +2955,34 @@ EOF
     save_rollback_info "rm -f /etc/modprobe.d/blacklist-nvidia-nouveau.conf"
     
     # 更新initramfs
-    log_info $(gettext "nouveau.disable.info.updating_initramfs")
+    log_info "$(gettext "nouveau.disable.info.updating_initramfs")"
     case $DISTRO_ID in
         ubuntu|debian)
             if ! update-initramfs -u; then
-                log_warning $(gettext "nouveau.disable.warning.initramfs_update_failed")
+                log_warning "$(gettext "nouveau.disable.warning.initramfs_update_failed")"
             fi
             ;;
         rhel|rocky|ol|almalinux|fedora|kylin|amzn)
             if command -v dracut &> /dev/null; then
                 if ! dracut -f; then
-                    log_warning $(gettext "nouveau.disable.warning.initramfs_update_failed")
+                    log_warning "$(gettext "nouveau.disable.warning.initramfs_update_failed")"
                 fi
             else
-                log_warning $(gettext "nouveau.disable.warning.dracut_missing")
+                log_warning "$(gettext "nouveau.disable.warning.dracut_missing")"
             fi
             ;;
         opensuse*|sles)
             if ! mkinitrd; then
-                log_warning $(gettext "nouveau.disable.warning.initramfs_update_failed")
+                log_warning "$(gettext "nouveau.disable.warning.initramfs_update_failed")"
             fi
             ;;
         azurelinux|mariner)
             if command -v dracut &> /dev/null; then
                 if ! dracut -f; then
-                    log_warning $(gettext "nouveau.disable.warning.initramfs_update_failed")
+                    log_warning "$(gettext "nouveau.disable.warning.initramfs_update_failed")"
                 fi
             else
-                log_warning $(gettext "nouveau.disable.warning.dracut_missing")
+                log_warning "$(gettext "nouveau.disable.warning.dracut_missing")"
             fi
             ;;
     esac
@@ -2991,7 +2993,7 @@ EOF
         read -r stopped_services < "$STATE_DIR/stopped_display_managers"
         
         if [[ -n "$stopped_services" ]]; then
-            log_info $(gettext "nouveau.disable.info.restarting_display_manager")
+            log_info "$(gettext "nouveau.disable.info.restarting_display_manager")"
             # 切换回图形模式
             systemctl isolate graphical.target 2>/dev/null || true
             sleep 2
@@ -3008,29 +3010,29 @@ EOF
     
     # 报告状态并决定后续行动
     if [[ "$need_reboot" == "true" ]]; then
-        log_warning $(gettext "nouveau.disable.warning.reboot_required_final")
+        log_warning "$(gettext "nouveau.disable.warning.reboot_required_final")"
         echo "NOUVEAU_NEEDS_REBOOT=true" > "$STATE_DIR/nouveau_status"
         
         echo
-        log_error $(gettext "nouveau.disable.error.reboot_needed_header")
-        echo $(gettext "nouveau.disable.error.reboot_needed_note")
+        log_error "$(gettext "nouveau.disable.error.reboot_needed_header")"
+        echo "$(gettext "nouveau.disable.error.reboot_needed_note")"
         echo
-        
+
         if [[ "$AUTO_YES" == "true" ]]; then
-            log_info $(gettext "nouveau.disable.info.auto_mode_reboot")
+            log_info "$(gettext "nouveau.disable.info.auto_mode_reboot")"
             save_state "nouveau_disabled_need_reboot"
             reboot
         else
-            if confirm $(gettext "nouveau.disable.confirm.reboot_now") "Y"; then
-                log_info $(gettext "nouveau.disable.info.rebooting_now")
+            if confirm "$(gettext "nouveau.disable.confirm.reboot_now")" "Y"; then
+                log_info "$(gettext "nouveau.disable.info.rebooting_now")"
                 save_state "nouveau_disabled_need_reboot"
                 reboot
             else
-                exit_with_code $EXIT_NOUVEAU_DISABLE_FAILED $(gettext "nouveau.disable.exit.user_refused_reboot")
+                exit_with_code $EXIT_NOUVEAU_DISABLE_FAILED "$(gettext "nouveau.disable.exit.user_refused_reboot")"
             fi
         fi
     else
-        log_success $(gettext "nouveau.disable.success.continue_install")
+        log_success "$(gettext "nouveau.disable.success.continue_install")"
         echo "NOUVEAU_NEEDS_REBOOT=false" > "$STATE_DIR/nouveau_status"
         
         # 既然nouveau已经成功禁用，就不需要在最终重启逻辑中额外处理
@@ -3040,20 +3042,20 @@ EOF
 
 # 启用persistence daemon
 enable_persistence_daemon() {
-    log_step $(gettext "persistence_daemon.enable.starting")
+    log_step "$(gettext "persistence_daemon.enable.starting")"
     
     if systemctl list-unit-files | grep -q nvidia-persistenced; then
         systemctl enable nvidia-persistenced
-        log_success $(gettext "persistence_daemon.enable.success")
+        log_success "$(gettext "persistence_daemon.enable.success")"
     else
-        log_warning $(gettext "persistence_daemon.enable.warning.service_not_found")
+        log_warning "$(gettext "persistence_daemon.enable.warning.service_not_found")"
     fi
 }
 
 # 验证安装
 verify_installation() {
-    log_step $(gettext "verify.starting")
-    
+    log_step "$(gettext "verify.starting")"
+
     local driver_working=false
     local needs_reboot=false
     
@@ -3062,26 +3064,26 @@ verify_installation() {
         local driver_version=$(cat /proc/driver/nvidia/version | head -1)
         log_success "$(gettext "verify.driver_loaded"): $driver_version"
     else
-        log_warning $(gettext "verify.warning.module_not_loaded")
+        log_warning "$(gettext "verify.warning.module_not_loaded")"
         needs_reboot=true
     fi
     
     # 检查nvidia-smi
     if command -v nvidia-smi &> /dev/null; then
-        log_success $(gettext "verify.success.smi_available")
-        log_info $(gettext "verify.info.testing_driver")
-        
+        log_success "$(gettext "verify.success.smi_available")"
+        log_info "$(gettext "verify.info.testing_driver")"
+
         if nvidia-smi &> /dev/null; then
-            log_success $(gettext "verify.success.driver_working")
+            log_success "$(gettext "verify.success.driver_working")"
             driver_working=true
             echo
             nvidia-smi
         else
-            log_error $(gettext "verify.error.smi_failed")
+            log_error "$(gettext "verify.error.smi_failed")"
             needs_reboot=true
         fi
     else
-        log_warning $(gettext "verify.warning.smi_unavailable")
+        log_warning "$(gettext "verify.warning.smi_unavailable")"
         needs_reboot=true
     fi
     
@@ -3092,7 +3094,7 @@ verify_installation() {
 
         # 检查是否是开源模块
         if [[ -f /sys/module/nvidia/version ]]; then
-            local module_version=$(cat /sys/module/nvidia/version 2>/dev/null || echo $(gettext "common.unknown"))
+            local module_version=$(cat /sys/module/nvidia/version 2>/dev/null || echo "$(gettext "common.unknown")")
             log_info "$(gettext "verify.info.module_version") $module_version"
         fi
     fi
@@ -3113,7 +3115,7 @@ verify_installation() {
 
 # 清理安装文件
 cleanup() {
-    log_step $(gettext "cleanup.install_files.starting")
+    log_step "$(gettext "cleanup.install_files.starting")"
 
     if [[ "$USE_LOCAL_REPO" == "true" ]]; then
         case $DISTRO_ID in
@@ -3141,7 +3143,7 @@ cleanup() {
 
 # 显示后续步骤 (更新信息)
 show_next_steps() {
-    log_success $(gettext "final.success.header")
+    log_success "$(gettext "final.success.header")"
     echo
     echo -e "${GREEN}$(gettext "final.summary.header")${NC}"
     echo -e "- $(gettext "final.summary.distro"): $DISTRO_ID $DISTRO_VERSION\n- $(gettext "final.summary.arch"): $ARCH\n- $(gettext "final.summary.module_type"): $(if $USE_OPEN_MODULES; then echo $(gettext "module.type.open_kernel"); else echo $(gettext "module.type.proprietary_kernel"); fi)\n- $(gettext "final.summary.install_type"): $INSTALL_TYPE\n- $(gettext "final.summary.repo_type"): $(if $USE_LOCAL_REPO; then echo $(gettext "repo.type.local"); else echo $(gettext "repo.type.network"); fi)"
@@ -3170,9 +3172,9 @@ show_next_steps() {
             echo
             echo -e "${YELLOW}$(gettext "final.next_steps.secure_boot.header")${NC}"
             if [[ "$driver_working" == "true" ]]; then
-                echo $(gettext "final.next_steps.secure_boot.working")
+                echo "$(gettext "final.next_steps.secure_boot.working")"
             else
-                echo $(gettext "final.next_steps.secure_boot.error")
+                echo "$(gettext "final.next_steps.secure_boot.error")"
             fi
         fi
     fi
@@ -3181,7 +3183,7 @@ show_next_steps() {
     
     if [[ "$INSTALL_TYPE" == "compute-only" ]]; then
         echo -e "${BLUE}$(gettext "final.notes.compute.header")${NC}"
-        echo $(gettext "final.notes.compute.notes")
+        echo "$(gettext "final.notes.compute.notes")"
     elif [[ "$INSTALL_TYPE" == "desktop-only" ]]; then
         echo -e "${BLUE}$(gettext "final.notes.desktop.header")${NC}"
         echo -e "$(gettext "final.notes.desktop.notes")"
@@ -3221,32 +3223,45 @@ select_language() {
     echo "Please select your preferred language:"
     echo "请选择您首选的语言:"
     echo
+    echo "1. 中文 (Simplified Chinese)"
+    echo "2. English"
+    echo
     
-    local choice=$(select_option "Please enter your choice / 请输入您的选择:" "1" \
-        "中文 (Simplified Chinese)" \
-        "English")
-    
-    case $choice in
-        1)
-            LANG_CURRENT="zh_CN"
-            echo "已选择中文 / Chinese selected"
-            ;;
-        2)
-            LANG_CURRENT="en_US"
-            echo "English selected / 已选择英文"
-            ;;
-    esac
+    while true; do
+        read -p "Please enter your choice (1-2) / 请输入您的选择 (1-2) [default/默认: 1]: " -r choice
+        
+        # 如果用户直接回车，使用默认值
+        if [[ -z "$choice" ]]; then
+            choice="1"
+        fi
+        
+        case $choice in
+            1)
+                LANG_CURRENT="zh_CN"
+                echo "已选择中文"
+                break
+                ;;
+            2)
+                LANG_CURRENT="en_US"
+                echo "English selected"
+                break
+                ;;
+            *)
+                echo "Invalid choice, please enter 1 or 2 / 无效选择，请输入1或2"
+                ;;
+        esac
+    done
     echo
 }
 
 # 主函数 (添加状态管理和无交互支持)
-main() {
+main() {    
     # 语言选择（在任何输出之前）
     select_language
-    
+
     # 检测终端环境，如果不是TTY则自动启用静默模式
     if [[ ! -t 0 ]] && [[ "$QUIET_MODE" != "true" ]]; then
-        log_info $(gettext "main.info.non_interactive_quiet_mode")
+        log_info "$(gettext "main.info.non_interactive_quiet_mode")"
         QUIET_MODE=true
     fi
 
@@ -3275,7 +3290,7 @@ main() {
     if [[ -n "$last_state" && "$last_state" != "installation_completed" ]]; then
         echo
         log_warning "$(gettext "main.resume.warning_incomplete_state_found") $last_state"
-        if ! [[ "$AUTO_YES" == "true" ]] && confirm $(gettext "main.resume.confirm_resume_install") "N"; then
+        if ! [[ "$AUTO_YES" == "true" ]] && confirm "$(gettext "main.resume.confirm_resume_install")" "N"; then
             log_info "$(gettext "main.resume.info_resuming")"
         else
             log_info "$(gettext "main.resume.info_restarting")"
@@ -3323,8 +3338,8 @@ main() {
         echo
 
         if ! [[ "$AUTO_YES" == "true" ]] && ! [[ "$FORCE_REINSTALL" == "true" ]] && ! [[ "$SKIP_EXISTING_CHECKS" == "true" ]]; then
-            if ! confirm $(gettext "main.config_summary.confirm") "Y"; then
-                exit_with_code $EXIT_USER_CANCELLED $(gettext "main.config_summary.user_cancel")
+            if ! confirm "$(gettext "main.config_summary.confirm")" "Y"; then
+                exit_with_code $EXIT_USER_CANCELLED "$(gettext "main.config_summary.user_cancel")"
             fi
         fi
         save_state "show_config"
@@ -3332,8 +3347,8 @@ main() {
     
     # 开始安装过程
     echo
-    log_info $(gettext "main.install.starting")
-    
+    log_info "$(gettext "main.install.starting")"
+
     # 安装内核头文件
     install_kernel_headers
     
@@ -3416,53 +3431,53 @@ main() {
     # 根据驱动实际工作状态决定重启行为
     if [[ "$driver_working" == "true" ]]; then
         # 驱动正常工作，不需要重启
-        log_success $(gettext "main.reboot_logic.success_no_reboot_needed")
-        echo $(gettext "main.reboot_logic.success_smi_passed")
-        
+        log_success "$(gettext "main.reboot_logic.success_no_reboot_needed")"
+        echo "$(gettext "main.reboot_logic.success_smi_passed")"
+
         if [[ "$REBOOT_AFTER_INSTALL" == "true" ]]; then
-            log_info $(gettext "main.reboot_logic.info_rebooting_on_user_request")
-            log_info $(gettext "main.reboot_logic.info_rebooting_now")
+            log_info "$(gettext "main.reboot_logic.info_rebooting_on_user_request")"
+            log_info "$(gettext "main.reboot_logic.info_rebooting_now")"
             cleanup_after_success
             reboot
         elif [[ "$AUTO_YES" == "true" ]]; then
-            log_success $(gettext "main.reboot_logic.success_auto_mode_no_reboot")
+            log_success "$(gettext "main.reboot_logic.success_auto_mode_no_reboot")"
             cleanup_after_success
         else
             # 交互模式，询问用户是否要重启（但不建议）
-            if confirm $(gettext "main.reboot_logic.confirm_optional_reboot") "N"; then
-                log_info $(gettext "main.reboot_logic.info_rebooting_now")
+            if confirm "$(gettext "main.reboot_logic.confirm_optional_reboot")" "N"; then
+                log_info "$(gettext "main.reboot_logic.info_rebooting_now")"
                 cleanup_after_success
                 reboot
             else
-                log_info $(gettext "main.reboot_logic.info_reboot_skipped")
+                log_info "$(gettext "main.reboot_logic.info_reboot_skipped")"
                 cleanup_after_success
             fi
         fi
     else
         # 驱动未正常工作，需要重启
-        log_warning $(gettext "main.reboot_logic.warning_reboot_required")
-        echo $(gettext "main.reboot_logic.warning_smi_failed_reboot_required")
-        
+        log_warning "$(gettext "main.reboot_logic.warning_reboot_required")"
+        echo "$(gettext "main.reboot_logic.warning_smi_failed_reboot_required")"
+
         if [[ "$nouveau_needs_reboot" == "true" ]]; then
-            echo $(gettext "main.reboot_logic.reason_nouveau")
+            echo "$(gettext "main.reboot_logic.reason_nouveau")"
         elif [[ "$driver_needs_reboot" == "true" ]]; then
-            echo $(gettext "main.reboot_logic.reason_module_load")
+            echo "$(gettext "main.reboot_logic.reason_module_load")"
         fi
         
         if [[ "$AUTO_YES" == "true" ]] || [[ "$REBOOT_AFTER_INSTALL" == "true" ]]; then
-            log_info $(gettext "main.reboot_logic.info_auto_mode_rebooting")
+            log_info "$(gettext "main.reboot_logic.info_auto_mode_rebooting")"
             rm -f "$STATE_FILE" "$ROLLBACK_FILE" "$STATE_DIR/nouveau_status" "$STATE_DIR/driver_status"
             cleanup_lock_files
             reboot
         else
-            if confirm $(gettext "main.reboot_logic.confirm_reboot_now") "Y"; then
-                log_info $(gettext "main.reboot_logic.info_rebooting_now")
+            if confirm "$(gettext "main.reboot_logic.confirm_reboot_now")" "Y"; then
+                log_info "$(gettext "main.reboot_logic.info_rebooting_now")"
                 rm -f "$STATE_FILE" "$ROLLBACK_FILE" "$STATE_DIR/nouveau_status" "$STATE_DIR/driver_status"
                 cleanup_lock_files
                 reboot
             else
-                log_warning $(gettext "main.reboot_logic.warning_manual_reboot_needed")
-                log_info $(gettext "main.reboot_logic.info_verify_after_reboot")
+                log_warning "$(gettext "main.reboot_logic.warning_manual_reboot_needed")"
+                log_info "$(gettext "main.reboot_logic.info_verify_after_reboot")"
                 # 保留状态文件供用户查看
                 cleanup_lock_files
             fi
