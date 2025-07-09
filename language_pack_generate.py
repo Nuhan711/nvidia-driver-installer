@@ -72,8 +72,8 @@ def generate_shell_lang_pack(entries, pack_name="LANG_PACK_ZH_CN"):
 
     for msgid, msgstr in entries:
         # 转义Shell中的特殊字符
-        escaped_msgid = msgid.replace('"', '\\"').replace("\\", "\\\\")
-        escaped_msgstr = msgstr.replace('"', '\\"').replace("\\", "\\\\")
+        escaped_msgid = msgid.replace('"', '\\"')
+        escaped_msgstr = msgstr.replace('"', '\\"')
 
         output += f'    ["{escaped_msgid}"]="{escaped_msgstr}"\n'
 

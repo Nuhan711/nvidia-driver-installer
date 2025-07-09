@@ -289,7 +289,7 @@ msgid "detect.gpu.starting"
 msgstr "Detecting NVIDIA GPU..."
 
 msgid "detect.gpu.error.lspci_missing"
-msgstr "`lspci` command not found. Please install pciutils."
+msgstr "\"lspci\" command not found. Please install pciutils."
 
 msgid "detect.gpu.error.no_gpu_found"
 msgstr "No NVIDIA GPU detected. Exiting script."
@@ -637,7 +637,7 @@ msgid "mok.setup.enroll.note"
 msgstr "1. You will be prompted to set a one-time password.\n2. Please remember this password, as it is required on reboot.\n3. A simple numeric password is recommended to avoid keyboard layout issues."
 
 msgid "mok.setup.error.enroll_failed"
-msgstr "MOK key enrollment failed. `mokutil --import` command failed."
+msgstr "MOK key enrollment failed. \"mokutil --import\" command failed."
 
 msgid "mok.setup.success.enroll_queued"
 msgstr "MOK key enrollment has been requested."
@@ -799,7 +799,7 @@ msgid "nouveau.disable.warning.initramfs_update_failed"
 msgstr "Failed to update initramfs."
 
 msgid "nouveau.disable.warning.dracut_missing"
-msgstr "`dracut` command not found, cannot update initramfs."
+msgstr "\"dracut\" command not found, cannot update initramfs."
 
 msgid "nouveau.disable.info.restarting_display_manager"
 msgstr "Attempting to restore the display manager..."
@@ -1009,7 +1009,7 @@ msgid "main.reboot_logic.success_no_reboot_needed"
 msgstr "Installation complete. Driver loaded successfully, no reboot needed!"
 
 msgid "main.reboot_logic.success_smi_passed"
-msgstr "`nvidia-smi` verification passed. Your GPU is ready."
+msgstr "\"nvidia-smi\" verification passed. Your GPU is ready."
 
 msgid "main.reboot_logic.info_rebooting_on_user_request"
 msgstr "Rebooting now as per your request (--auto-reboot)."
@@ -1030,7 +1030,7 @@ msgid "main.reboot_logic.warning_reboot_required"
 msgstr "Installation complete, but a reboot is required for the driver to take effect."
 
 msgid "main.reboot_logic.warning_smi_failed_reboot_required"
-msgstr "`nvidia-smi` verification failed, indicating the driver is not loaded correctly."
+msgstr "\"nvidia-smi\" verification failed, indicating the driver is not loaded correctly."
 
 msgid "main.reboot_logic.reason_nouveau"
 msgstr "Reason: A reboot is needed to completely disable the nouveau driver."
@@ -1048,4 +1048,4 @@ msgid "main.reboot_logic.warning_manual_reboot_needed"
 msgstr "User chose to reboot later. Please reboot your system manually."
 
 msgid "main.reboot_logic.info_verify_after_reboot"
-msgstr "After rebooting, you can use the `nvidia-smi` command to verify that the driver is working correctly."
+msgstr "After rebooting, you can use the \"nvidia-smi\" command to verify that the driver is working correctly."
